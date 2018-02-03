@@ -1,0 +1,9 @@
+laspad
+laspad.tar.gz
+laspad.7z
+*.exe
+*.o
+*.obj
+*.lst
+*.so
+*.dll
