@@ -7,3 +7,7 @@ laspad.7z
 *.lst
 *.so
 *.dll
+
+/target/
+**/*.rs.bk
+Cargo.lock

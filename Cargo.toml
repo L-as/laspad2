@@ -1,0 +1,12 @@
+[package]
+name = "laspad"
+version = "0.1.0"
+authors = ["Las <las@protonmail.ch>"]
+license = "GPLv3"
+publish = false
+
+[dependencies]
+git2       = "0.6"
+regex      = "2"
+toml       = "0.4"
+libloading = "0.5"
