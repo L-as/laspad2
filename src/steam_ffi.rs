@@ -1,5 +1,5 @@
 #[repr(u32)]
-pub enum Result {
+pub enum GeneralResult {
 	OK                                      = 1,
 	Fail                                    = 2,
 	NoConnection                            = 3,
@@ -160,7 +160,7 @@ struct Strings {
 
 #[repr(packed)]
 struct PublishFileResult {
-	result:           Result,
+	result:           GeneralResult,
 	item:             Item,
 	accept_agreement: bool,
 }
@@ -170,6 +170,7 @@ impl PublishFileResult {
 	const UPDATE_PUBLISH_CALLBACK_ID:  u64 = 1316;
 }
 
+#[link(name = "steam_api")]
 extern {
 	fn SteamAPI_Init() -> bool;
 
