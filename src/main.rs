@@ -15,6 +15,7 @@ extern crate byteorder;
 extern crate zip;
 extern crate curl;
 extern crate regex;
+extern crate pretty_env_logger;
 
 mod steam;
 
@@ -27,10 +28,12 @@ use git2::Repository;
 use std::process::exit;
 
 fn main() {
-	steam::init().unwrap_or_else(|_| {
-		eprintln!("Could not initialise Steam API!");
-		exit(1);
-	});
+	//steam::init().unwrap_or_else(|_| {
+	//	eprintln!("Could not initialise Steam API!");
+	//	exit(1);
+	//});
+
+	pretty_env_logger::init();
 
 	let matches = clap_app!(laspad =>
 		(version: "2.0")
