@@ -9,7 +9,7 @@ publish = false
 git2              = "*"
 regex             = "*"
 toml              = "*"
-clap              = "2"
+clap              = {version = "2", features = ["color"]}
 curl              = "*"
 serde             = "1"
 serde_derive      = "1"
