@@ -10,7 +10,6 @@ use std::fs::{self, File};
 use std::process::exit;
 use std::io::{Read, Write, Cursor};
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use zip::read::ZipArchive;
 
@@ -105,7 +104,7 @@ pub fn main<'a>(repo: Repository, matches: &ArgMatches<'a>) {
 
 		let path = PathBuf::from(&format!("dependencies/{}", dep));
 		if path.exists() {
-			eprintln!("Dependency already exists!");
+			error!("Dependency already exists!");
 			exit(1);
 		};
 
@@ -140,7 +139,7 @@ pub fn main<'a>(repo: Repository, matches: &ArgMatches<'a>) {
 			panic!("NYI")
 		},
 		_ => {
-			eprintln!("Not a valid command!");
+			error!("Not a valid command!");
 			exit(1)
 		}
 	};
