@@ -6,18 +6,19 @@ license = "GPLv3"
 publish = false
 
 [dependencies]
-git2              = "0.6"
-regex             = "0.2"
-toml              = "0.4"
+git2              = "*"
+regex             = "*"
+toml              = "*"
 clap              = "2"
-curl              = "0.4"
+curl              = "*"
 serde             = "1"
 serde_derive      = "1"
-serde-xml-rs      = "0.2"
+serde-xml-rs      = "*"
 byteorder         = "1"
-zip               = "0.3.0"
-log               = "0.4"
+zip               = "*"
+log               = "*"
 pretty_env_logger = "*"
+lazy_static       = "1"
 
 [build-dependencies]
-curl = "0.4"
+curl = "*"
