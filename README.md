@@ -22,3 +22,14 @@ Note, however, that there *are* limits to how well this works!
 ## Previews
 Previews can be in any format, unlike Launch Pad.
 You can use PNG, JPG, and have it in 4k, 8k, 32T, or anything like that.
+
+# "Dependencies"
+The `need` command adds a workshop item as dependency. What this means, is
+that whenever you publish or compile, the dependencies will also be included.
+
+You can use this to avoid having too many mods on your server.
+NB: Multiple mods having the same dependencies does not work well. I do one
+day want to solve this problem.
+
+## Deleting dependencies
+You just remove the folder, that's how simple it is.
