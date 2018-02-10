@@ -7,8 +7,8 @@ type Result = io::Result<()>;
 fn iterate_dir<F>(root: &Path, path: &Path, f: &F) -> Result
 	where F: Fn(&Path, &Path) -> Result
 {
-	for entry in fs::read_dir(path)? {
-		let entry = &entry?.path();
+	for entry in fs::read_dir(path).expect("Attempted to read non-existent directory!") {
+		let entry = &entry.expect("Could not access file").path();
 		if entry.is_dir() {
 			iterate_dir(root, entry, f)?;
 		} else {
@@ -76,14 +76,16 @@ pub fn iterate_files<F>(path: &Path, f: &F) -> Result
 pub fn main() -> Result {
 	let dest = Path::new("compiled");
 
-	fs::remove_dir_all(dest)?;
-	fs::create_dir(dest)?;
+	if dest.exists() {
+		fs::remove_dir_all(dest).expect("Couldn't remove directory 'compiled'");
+		fs::create_dir(dest).expect("Couldn't create directory 'compiled'");
+	}
 
 	iterate_files(&Path::new("."), &|path, rel_path| {
 		trace!("{:?} < {:?}", rel_path, path);
 		let dest = dest.join(rel_path);
 		match dest.parent() {
-			Some(parent) => fs::create_dir_all(parent)?,
+			Some(parent) => fs::create_dir_all(parent).expect("Couldn't create necessary directories for file"),
 			None         => {},
 		};
 		let as_str = &rel_path.to_str().unwrap();

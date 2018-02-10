@@ -6,7 +6,6 @@ license = "GPLv3"
 publish = false
 
 [dependencies]
-git2              = "*"
 regex             = "*"
 toml              = "*"
 clap              = {version = "2", features = ["color"]}

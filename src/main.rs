@@ -10,7 +10,6 @@ extern crate log;
 extern crate lazy_static;
 
 extern crate toml;
-extern crate git2;
 extern crate serde;
 extern crate serde_xml_rs;
 extern crate byteorder;
@@ -23,10 +22,9 @@ mod steam;
 
 // console commands
 mod init;
-mod dependency;
+mod need;
+mod update;
 mod compile;
-
-use git2::Repository;
 
 use std::process::exit;
 use std::path::Path;
@@ -48,18 +46,12 @@ fn main() {
 		(@subcommand init =>
 		 	(about: "Initialises laspad in the current directory")
 		)
-		(@subcommand dependency =>
-			(about: "Manage dependencies")
-			(@setting SubcommandRequiredElseHelp)
-			(@setting VersionlessSubcommands)
-			(@subcommand add =>
-				(about: "Adds dependency")
-				(@arg ID: +required "Hexadecimal ID of workshop item or link to git repository to add as dependency")
-			)
-			(@subcommand rm =>
-				(about: "Removes dependency")
-				(@arg ID: +required "Can be either a hexadecimal ID for a workshop item or the name of the repository to remove")
-			)
+		(@subcommand need =>
+			(about: "Makes workshop item dependency")
+			(@arg MODID: +required "Hexadecimal ID of workshop item")
+		)
+		(@subcommand update =>
+			(about: "Updates dependencies\nNB: `publish` automatically runs `update`")
 		)
 		(@subcommand compile =>
 			(about: "\
@@ -69,7 +61,7 @@ This means that changes in the compiled files will be reflected in the source an
 vice versa.")
 		)
 		(@subcommand publish =>
-			(about: "Publishes the mod to workshop")
+			(about: "Updates dependencies and then publishes the mod to workshop")
 			(@arg branch: "The branch to publish, defaults to master")
 		)
 		//(@subcommand launch =>
@@ -87,12 +79,10 @@ vice versa.")
 		//)
 	).get_matches();
 
-	let repo = Repository::open(".").unwrap_or_else(|e| {
-		error!("Could not open git repository: {}", e); exit(1)
-	});
+	let git = Path::new(".git").exists();
 
 	if matches.subcommand_name() == Some("init") {
-		init::main(repo);
+		init::main(git).unwrap();
 	} else {
 		if !Path::new("laspad.toml").exists() {
 			error!("This is not a laspad project!");
@@ -100,11 +90,12 @@ vice versa.")
 		};
 
 		match matches.subcommand() {
-			("dependency", Some(m)) => {dependency::main(repo, m)},
-			("compile", Some(_))    => {compile::main().unwrap()},
+			("need",    Some(m)) => {need::   main(git, m).unwrap()},
+			("update",  Some(_)) => {update:: main(      ).unwrap()},
+			("compile", Some(_)) => {compile::main(      ).unwrap()},
+			//("publish", Some(_)) => {publish::   main(      ).unwrap()},
 			_                       => {
-				error!("Not a valid command!");
-				exit(1);
+				unreachable!();
 			},
 		};
 	};
