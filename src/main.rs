@@ -1,4 +1,5 @@
-#![feature(use_nested_groups)]
+#![feature(extern_types)]
+#![allow(safe_packed_borrows)]
 
 #[macro_use]
 extern crate clap;
@@ -17,6 +18,7 @@ extern crate zip;
 extern crate curl;
 extern crate regex;
 extern crate pretty_env_logger;
+extern crate git2;
 
 mod steam;
 
@@ -25,6 +27,7 @@ mod init;
 mod need;
 mod update;
 mod compile;
+mod publish;
 
 use std::process::exit;
 use std::path::Path;
@@ -62,7 +65,7 @@ vice versa.")
 		)
 		(@subcommand publish =>
 			(about: "Updates dependencies and then publishes the mod to workshop")
-			(@arg branch: "The branch to publish, defaults to master")
+			(@arg BRANCH: "The branch to publish, defaults to master")
 		)
 		//(@subcommand launch =>
 		// 	(about: "Launches an external spark program with this mod")
@@ -79,10 +82,8 @@ vice versa.")
 		//)
 	).get_matches();
 
-	let git = Path::new(".git").exists();
-
 	if matches.subcommand_name() == Some("init") {
-		init::main(git).unwrap();
+		init::main().unwrap();
 	} else {
 		if !Path::new("laspad.toml").exists() {
 			error!("This is not a laspad project!");
@@ -90,10 +91,10 @@ vice versa.")
 		};
 
 		match matches.subcommand() {
-			("need",    Some(m)) => {need::   main(git, m).unwrap()},
-			("update",  Some(_)) => {update:: main(      ).unwrap()},
-			("compile", Some(_)) => {compile::main(      ).unwrap()},
-			//("publish", Some(_)) => {publish::   main(      ).unwrap()},
+			("need",    Some(m)) => {need::   main(m.value_of("MODID" ).unwrap()).unwrap()},
+			("update",  Some(_)) => {update:: main().unwrap()},
+			("compile", Some(_)) => {compile::main().unwrap()},
+			("publish", Some(m)) => {publish::main(     m.value_of("BRANCH").unwrap_or("master"))},
 			_                       => {
 				unreachable!();
 			},

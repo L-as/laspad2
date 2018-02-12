@@ -1,5 +1,6 @@
 #[repr(u32)]
-pub enum GeneralResult {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SteamResult {
 	OK                                      = 1,
 	Fail                                    = 2,
 	NoConnection                            = 3,
@@ -111,31 +112,17 @@ pub enum GeneralResult {
 	WGNetworkSendExceeded                   = 110,
 }
 
-#[repr(i64)]
-pub enum FailureReason {
-	None               = -1,
-	SteamGone          = 0,
-	NetworkFailure     = 1,
-	InvalidHandle      = 2,
-	MismatchedCallback = 3,
-}
-
 #[repr(C)]
-pub struct Callback(u64);
-
-#[repr(C)]
-pub struct Item(pub u64);
-
-enum RemoteStorageImpl {}
-#[repr(C)]
-pub struct RemoteStorage(*mut RemoteStorageImpl);
-
-enum UtilsImpl {}
-#[repr(C)]
-pub struct Utils(*mut UtilsImpl);
-
-#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct UpdateHandle(u64);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct User(i32);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Pipe(i32);
 
 #[repr(u32)]
 enum Visibility {
@@ -154,45 +141,46 @@ enum FileType {
 #[repr(C)]
 #[repr(packed)]
 struct Strings {
-	elements: *const *const u8,
+	elements: *const *const i8,
 	length:   u32,
 }
 
-#[repr(packed)]
-struct PublishFileResult {
-	result:           GeneralResult,
-	item:             Item,
-	accept_agreement: bool,
-}
-
-impl PublishFileResult {
-	const INITIAL_PUBLISH_CALLBACK_ID: u64 = 1309;
-	const UPDATE_PUBLISH_CALLBACK_ID:  u64 = 1316;
-}
-
 #[link(name = "steam_api")]
-extern {
+#[no_mangle]
+extern "C" {
+	type RemoteStorageImpl;
+	type UtilsImpl;
+	type ClientImpl;
+
 	fn SteamAPI_Init() -> bool;
 
-	fn SteamRemoteStorage() -> RemoteStorage;
-	fn SteamUtils()         -> Utils;
+	//fn SteamRemoteStorage() -> *mut RemoteStorageImpl;
+	//fn SteamUtils()         -> *mut UtilsImpl;
 
-	fn SteamAPI_ISteamRemoteStorage_PublishWorkshopFile(a: RemoteStorage, b: *const u8, c: *const u8, d: u32, e: *const u8, f: *const u8, g: Visibility, h: *const Strings, i: FileType) -> Callback;
+	fn SteamAPI_ISteamRemoteStorage_PublishWorkshopFile(a: *mut RemoteStorageImpl, b: *const i8, c: *const i8, d: u32, e: *const i8, f: *const i8, g: Visibility, h: *const Strings, i: FileType) -> APICall;
 
-	fn SteamAPI_ISteamRemoteStorage_FileWrite(a:  RemoteStorage, b: *const u8, c: *const u8, d: u32) -> bool;
-	fn SteamAPI_ISteamRemoteStorage_FileDelete(a: RemoteStorage, b: *const u8) -> bool;
+	fn SteamAPI_ISteamRemoteStorage_FileWrite(a:  *mut RemoteStorageImpl, b: *const i8, c: *const u8, d: u32) -> bool;
+	fn SteamAPI_ISteamRemoteStorage_FileDelete(a: *mut RemoteStorageImpl, b: *const i8) -> bool;
 
-	fn SteamAPI_ISteamRemoteStorage_CreatePublishedFileUpdateRequest(a: RemoteStorage, b: Item)         -> UpdateHandle;
-	fn SteamAPI_ISteamRemoteStorage_CommitPublishedFileUpdate(a:        RemoteStorage, b: UpdateHandle) -> Callback;
+	fn SteamAPI_ISteamRemoteStorage_CreatePublishedFileUpdateRequest(a: *mut RemoteStorageImpl, b: Item)         -> UpdateHandle;
+	fn SteamAPI_ISteamRemoteStorage_CommitPublishedFileUpdate(a:        *mut RemoteStorageImpl, b: UpdateHandle) -> APICall;
 
-	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileFile(a:                 RemoteStorage, b: UpdateHandle, c: *const u8)      -> bool;
-	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFilePreviewFile(a:          RemoteStorage, b: UpdateHandle, c: *const u8)      -> bool;
-	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileDescription(a:          RemoteStorage, b: UpdateHandle, c: *const u8)      -> bool;
-	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileSetChangeDescription(a: RemoteStorage, b: UpdateHandle, c: *const u8)      -> bool;
-	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTags(a:                 RemoteStorage, b: UpdateHandle, c: *const Strings) -> bool;
-	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTitle(a:                RemoteStorage, b: UpdateHandle, c: *const u8)      -> bool;
+	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileFile(a:                 *mut RemoteStorageImpl, b: UpdateHandle, c: *const i8)      -> bool;
+	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFilePreviewFile(a:          *mut RemoteStorageImpl, b: UpdateHandle, c: *const i8)      -> bool;
+	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileDescription(a:          *mut RemoteStorageImpl, b: UpdateHandle, c: *const i8)      -> bool;
+	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileSetChangeDescription(a: *mut RemoteStorageImpl, b: UpdateHandle, c: *const i8)      -> bool;
+	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTags(a:                 *mut RemoteStorageImpl, b: UpdateHandle, c: *const Strings) -> bool;
+	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTitle(a:                *mut RemoteStorageImpl, b: UpdateHandle, c: *const i8)      -> bool;
 
-	fn SteamAPI_ISteamUtils_IsAPICallCompleted(a:      Utils, b: Callback, c: *mut bool) -> bool;
-	fn SteamAPI_ISteamUtils_GetAPICallResult(a:        Utils, b: Callback, c: *mut u8,   d: u32, e: u32, f: *mut bool) -> bool;
-	fn SteamAPI_ISteamUtils_GetAPICallFailureReason(a: Utils, b: Callback) -> FailureReason;
+	fn SteamAPI_ISteamUtils_IsAPICallCompleted(a:      *mut UtilsImpl, b: APICall, c: *mut bool) -> bool;
+	fn SteamAPI_ISteamUtils_GetAPICallResult(a:        *mut UtilsImpl, b: APICall, c: *mut u8,   d: u32, e: u32, f: *mut bool) -> bool;
+	fn SteamAPI_ISteamUtils_GetAPICallFailureReason(a: *mut UtilsImpl, b: APICall) -> APICallFailureReason;
+
+	fn SteamAPI_ISteamClient_GetISteamRemoteStorage(a: *const ClientImpl, b: User, c: Pipe, d: *const i8) -> *mut RemoteStorageImpl;
+	fn SteamAPI_ISteamClient_GetISteamUtils(a:         *const ClientImpl, b: Pipe, c: *const i8)          -> *mut UtilsImpl;
+
+	fn SteamAPI_GetHSteamUser() -> User;
+	fn SteamAPI_GetHSteamPipe() -> Pipe;
+
+	fn SteamInternal_CreateInterface(a: *const i8) -> *mut u8;
 }

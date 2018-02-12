@@ -4,22 +4,26 @@ use std::path::Path;
 
 type Result = io::Result<()>;
 
-fn iterate_dir<F>(root: &Path, path: &Path, f: &F) -> Result
-	where F: Fn(&Path, &Path) -> Result
+fn iterate_dir<F>(root: &Path, path: &Path, f: &mut F) -> Result
+	where F: FnMut(&Path, &Path) -> Result
 {
 	for entry in fs::read_dir(path).expect("Attempted to read non-existent directory!") {
 		let entry = &entry.expect("Could not access file").path();
-		if entry.is_dir() {
-			iterate_dir(root, entry, f)?;
+		if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
+			if entry.is_dir() {
+				iterate_dir(root, entry, f)?;
+			} else {
+				f(entry, entry.strip_prefix(root).unwrap())?;
+			};
 		} else {
-			f(entry, entry.strip_prefix(root).unwrap())?;
+			debug!("Ignored file {:?}", entry);
 		};
 	};
 	Ok(())
 }
 
-pub fn iterate_files<F>(path: &Path, f: &F) -> Result
-	where F: Fn(&Path, &Path) -> Result
+pub fn iterate_files<F>(path: &Path, f: &mut F) -> Result
+	where F: FnMut(&Path, &Path) -> Result
 {
 
 	if path.join(".update_timestamp").exists() {
@@ -81,31 +85,22 @@ pub fn main() -> Result {
 		fs::create_dir(dest).expect("Couldn't create directory 'compiled'");
 	}
 
-	iterate_files(&Path::new("."), &|path, rel_path| {
+	iterate_files(&Path::new("."), &mut |path, rel_path| {
 		trace!("{:?} < {:?}", rel_path, path);
 		let dest = dest.join(rel_path);
 		match dest.parent() {
 			Some(parent) => fs::create_dir_all(parent).expect("Couldn't create necessary directories for file"),
 			None         => {},
 		};
-		let as_str = &rel_path.to_str().unwrap();
-		if [
-			".modinfo",
-			".update_timestamp",
-		].iter().any(|s| s == as_str) {
-			debug!("Ignored {:?}", path);
-			Ok(())
-		} else {
-			if let Err(e) = fs::hard_link(path, dest) {
-				if e.kind() == io::ErrorKind::AlreadyExists {
-					warn!("Multiple mods have file {:?}!", rel_path);
-					Ok(())
-				} else {
-					Err(e)
-				}
-			} else {
+		if let Err(e) = fs::hard_link(path, dest) {
+			if e.kind() == io::ErrorKind::AlreadyExists {
+				warn!("Multiple mods have file {:?}!", rel_path);
 				Ok(())
+			} else {
+				Err(e)
 			}
+		} else {
+			Ok(())
 		}
 	})
 }

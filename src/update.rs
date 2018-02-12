@@ -12,7 +12,7 @@ mod ns2_xml_format {
 	#[derive(Deserialize, Debug)]
 	pub struct PublishedFile {
 		pub publishedfileid: u64,
-		pub file_url:        String,
+		pub file_url:        Box<str>,
 		pub time_updated:    u64,
 	}
 

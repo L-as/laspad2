@@ -18,6 +18,7 @@ zip               = "*"
 log               = "*"
 pretty_env_logger = "*"
 lazy_static       = "1"
+git2              = "*"
 
 [build-dependencies]
 curl = "*"

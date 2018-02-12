@@ -1,8 +1,9 @@
 use std::process::exit;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Result, Write};
+use std::path::Path;
 
-pub fn main(git: bool) -> Result<()> {
+pub fn main() -> Result<()> {
 	if File::open("laspad.toml").is_ok() {
 		eprintln!("This is already a laspad project!");
 		exit(1);
@@ -14,7 +15,7 @@ pub fn main(git: bool) -> Result<()> {
 
 	fs::create_dir_all("src")?;
 
-	if git {
+	if Path::new(".git").exists() {
 		OpenOptions::new()
 			.create(true)
 			.append(true)

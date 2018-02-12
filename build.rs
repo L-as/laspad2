@@ -2,8 +2,6 @@ extern crate curl;
 
 use std::io::Write;
 use std::fs::File;
-use std::fs;
-use std::process::Command;
 
 use curl::easy::Easy;
 
