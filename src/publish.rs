@@ -32,12 +32,12 @@ pub fn generate_description(modid: u64) -> String {
 		let repo = Repository::open(".").unwrap();
 		if let Ok(origin) = repo.find_remote("origin") {
 			let origin = origin.url().unwrap();
-			let head = repo.head().unwrap();
-			let head = head.shorthand().unwrap_or("<N/A>");
+			let head   = repo.head().unwrap();
+			let oid    = head.peel_to_commit().unwrap().id();
 			s.push_str(&format!(
 				"[b][url={}]git repository[/url][/b]\ncurrent git commit: {}\n\n",
 				origin,
-				head
+				oid
 			));
 		};
 	};
@@ -222,12 +222,8 @@ pub fn main(branch_name: &str) {
 		.and_then(|u| if Path::new(".git").exists() {
 			let repo = Repository::open(".").expect("Could not open git repo!");
 			let head = repo.head().unwrap();
-			let shorthand = head.shorthand();
-			if shorthand.is_some() {
-				u.change_description(shorthand.unwrap())
-			} else {
-				Ok(u)
-			}
+			let oid = head.peel_to_commit().unwrap().id();
+			u.change_description(&format!("git commit: {}", oid))
 		} else {
 			Ok(u)
 		})
