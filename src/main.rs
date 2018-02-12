@@ -41,7 +41,7 @@ fn main() {
 	pretty_env_logger::init();
 
 	let matches = clap_app!(laspad =>
-		(version: "2.0")
+		(version: crate_version!())
 		(author:  "las <las@protonmail.ch>")
 		(about:   "Replacement of Launch Pad for Natural Selection 2, i.e. can publish mods to workshop.")
 		(@setting SubcommandRequiredElseHelp)
