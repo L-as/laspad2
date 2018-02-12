@@ -6,17 +6,13 @@ use std::fs::File;
 use curl::easy::Easy;
 
 fn main() {
-	let out = ::std::env::var("OUT_DIR").unwrap();
-
-	println!("cargo:rerun-if-changed=lua-stdlib");
-
 	// Linking to steam's API
 	{
 		for lib in [
 			"libsteam_api.so",
 			"steam_api64.dll",
 		].iter() {
-			let path = &format!("{}/{}", out, lib);
+			let path = lib;
 			if File::open(path).is_ok() {
 				println!("Skipped already downloaded {}", lib);
 				continue;
@@ -33,7 +29,7 @@ fn main() {
 			println!("Downloaded {}", lib);
 		}
 
-		println!("cargo:rustc-link-search=native={}", out);
+		println!("cargo:rustc-link-search=native=.");
 		println!("cargo:rustc-env=LD_RUN_PATH=$ORIGIN");
 	};
 }
