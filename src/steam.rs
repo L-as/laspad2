@@ -29,6 +29,7 @@ pub trait APICallResult {
 }
 
 #[repr(packed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PublishItemResult {
 	pub result:           SteamResult,
 	pub item:             Item,
@@ -40,6 +41,7 @@ impl APICallResult for PublishItemResult {
 }
 
 #[repr(packed)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpdateItemResult {
 	pub result:           SteamResult,
 	pub item:             Item,
@@ -159,26 +161,22 @@ impl Utils {
 		unsafe { SteamAPI_ISteamUtils_IsAPICallCompleted(self.0, call, &mut b as *mut bool) }
 	}
 
-	pub fn get_apicall_result<T: APICallResult>(&self, call: APICall) -> Result<T, APICallFailureReason> {
+	pub fn get_apicall_result<T: APICallResult + fmt::Debug>(&self, call: APICall) -> T {
 		while !self.is_apicall_completed(call) {};
 
 		let mut result: T = unsafe { zeroed() };
 
-		let mut b = false;
+		let mut _b = false; // ignore Steam saying we have errors, because we don't. Steam just has trouble accepting that fact.
 		assert!(unsafe {SteamAPI_ISteamUtils_GetAPICallResult(
 			self.0,
 			call,
 			transmute(&mut result),
 			size_of::<T>() as u32,
 			T::CALLBACK_ID,
-			&mut b as *mut bool
+			&mut _b as *mut bool
 		)});
 
-		if b {
-			Ok(result)
-		} else {
-			Err(unsafe { SteamAPI_ISteamUtils_GetAPICallFailureReason(self.0, call) })
-		}
+		result
 	}
 }
 

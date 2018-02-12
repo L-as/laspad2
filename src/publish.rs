@@ -88,25 +88,15 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 		exit(1)
 	});
 
-	let result = loop {
-		let apicall = remote.publish_workshop_file(
-			"laspad_mod.zip",
-			"laspad_mod.zip",
-			"dummy",
-			"dummy",
-			&[]
-		);
+	let apicall = remote.publish_workshop_file(
+		"laspad_mod.zip",
+		"laspad_mod.zip",
+		"dummy",
+		"dummy",
+		&[]
+	);
 
-		println!("apicall: {:?}", apicall);
-		match utils.get_apicall_result::<steam::PublishItemResult>(apicall) {
-			Ok(result) => {
-				break result;
-			},
-			Err(reason) => {
-				error!("Could not publish dummy item: {:?}", reason);
-			}
-		};
-	};
+	let result = utils.get_apicall_result::<steam::PublishItemResult>(apicall);
 
 	if result.result == SteamResult::OK {
 		result.item
@@ -193,6 +183,9 @@ pub fn main(branch_name: &str) {
 		error!("Could not read preview: {}", e);
 		exit(1);
 	});
+	if preview.len() == 0 { // Steam craps itself when it has 0 length
+		preview.push(0);
+	};
 
 	let mut description = if branch.autodescription {
 		generate_description(item.0)
@@ -215,40 +208,31 @@ pub fn main(branch_name: &str) {
 		exit(1)
 	};
 
-	let result = loop {
-		let apicall = remote.update_workshop_file(item)
-			.title(&branch.name)
-			.and_then(|u| u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()))
-			.and_then(|u| u.description(&description))
-			.and_then(|u| u.preview("laspad_preview"))
-			.and_then(|u| u.contents("laspad_mod.zip"))
-			.and_then(|u| if Path::new(".git").exists() {
-				let repo = Repository::open(".").expect("Could not open git repo!");
-				let head = repo.head().unwrap();
-				let shorthand = head.shorthand();
-				if shorthand.is_some() {
-					u.change_description(shorthand.unwrap())
-				} else {
-					Ok(u)
-				}
+	let apicall = remote.update_workshop_file(item)
+		.title(&branch.name)
+		.and_then(|u| u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()))
+		.and_then(|u| u.description(&description))
+		.and_then(|u| u.preview("laspad_preview"))
+		.and_then(|u| u.contents("laspad_mod.zip"))
+		.and_then(|u| if Path::new(".git").exists() {
+			let repo = Repository::open(".").expect("Could not open git repo!");
+			let head = repo.head().unwrap();
+			let shorthand = head.shorthand();
+			if shorthand.is_some() {
+				u.change_description(shorthand.unwrap())
 			} else {
 				Ok(u)
-			})
-			.map(|u| u.commit())
-			.unwrap_or_else(|_| {
-				error!("Could not request update for mod!");
-				exit(1)
-			});
-
-		match utils.get_apicall_result::<steam::UpdateItemResult>(apicall) {
-			Ok(result) => {
-				break result;
-			},
-			Err(reason) => {
-				error!("Could not update item: {:?}", reason);
 			}
-		};
-	};
+		} else {
+			Ok(u)
+		})
+		.map(|u| u.commit())
+		.unwrap_or_else(|_| {
+			error!("Could not request update for mod!");
+			exit(1)
+		});
+
+	let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
 
 	if result.result == SteamResult::OK {
 		println!("Published mod: {:X}", result.item.0);
