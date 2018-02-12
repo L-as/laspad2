@@ -94,7 +94,7 @@ vice versa.")
 			("need",    Some(m)) => {need::   main(m.value_of("MODID" ).unwrap()).unwrap()},
 			("update",  Some(_)) => {update:: main().unwrap()},
 			("compile", Some(_)) => {compile::main().unwrap()},
-			("publish", Some(m)) => {publish::main(     m.value_of("BRANCH").unwrap_or("master"))},
+			("publish", Some(m)) => {publish::main(m.value_of("BRANCH").unwrap_or("master"))},
 			_                       => {
 				unreachable!();
 			},

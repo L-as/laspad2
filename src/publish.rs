@@ -147,7 +147,7 @@ pub fn main(branch_name: &str) {
 		steam::Item(u64::from_str_radix(&buf, 16).unwrap())
 	} else {
 		let item = create_workshop_item(&mut remote, &mut utils);
-		println!("Mod ID: {:X}", item.0);
+		println!("Created Mod ID: {:X}", item.0);
 		File::create(&modid_file).and_then(|mut f| f.write_all(format!("{:X}", item.0).as_bytes())).unwrap_or_else(|_| {
 			error!("Could not write {:X} to {:?}", item.0, modid_file);
 		});
@@ -156,6 +156,7 @@ pub fn main(branch_name: &str) {
 
 	update::main().unwrap();
 
+	println!("Zipping up files");
 	let zip = Vec::new();
 	let zip = {
 		let mut cursor = Cursor::new(zip);
@@ -178,6 +179,7 @@ pub fn main(branch_name: &str) {
 		zip.finish().unwrap().into_inner()
 	};
 
+	println!("Finished preparing preview and description");
 	let mut preview = Vec::new();
 	File::open(&*branch.preview).and_then(|mut f| f.read_to_end(&mut preview)).unwrap_or_else(|e| {
 		error!("Could not read preview: {}", e);
@@ -198,16 +200,19 @@ pub fn main(branch_name: &str) {
 		exit(1)
 	});
 
+	println!("Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
 		error!("Could not write mod file to steam!");
 		exit(1)
 	};
 
+	println!("Uploading preview");
 	if remote.file_write("laspad_preview", &preview).is_err() {
 		error!("Could not write preview file to steam!");
 		exit(1)
 	};
 
+	println!("Requesting workshop item update");
 	let apicall = remote.update_workshop_file(item)
 		.title(&branch.name)
 		.and_then(|u| u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()))
