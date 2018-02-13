@@ -60,8 +60,9 @@ pub struct ItemUpdater<'a> {
 impl<'a> ItemUpdater<'a> {
 	pub fn tags(&self, tags: &[&str]) -> Result<&Self, ()> {
 		let tags = Strings {
-			elements: tags.iter().map(|&s| CString::new(s).unwrap().as_ptr()).collect::<Vec<_>>().as_ptr(),
-			length: tags.len() as u32,
+			//elements: tags.iter().map(|&s| CString::new(s).unwrap().as_ptr()).collect::<Vec<_>>().as_ptr(),
+			elements: &["ABC".as_ptr() as *const i8, "DEF".as_ptr() as *const i8] as *const *const i8,
+			length: tags.len() as i32,
 		};
 
 		if unsafe { SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTags(self.storage.0, self.handle, &tags as *const Strings) } {
@@ -113,6 +114,15 @@ impl<'a> ItemUpdater<'a> {
 pub struct RemoteStorage(*mut RemoteStorageImpl);
 
 impl RemoteStorage {
+	pub fn new() -> Result<Self, ()> {
+		let ptr = SteamRemoteStorage();
+		if ptr.is_null() {
+			Err(())
+		} else {
+			Ok(RemoteStorage(ptr))
+		}
+	}
+
 	pub fn file_write(&mut self, name: &str, data: &[u8]) -> Result<(), ()> {
 		if unsafe {SteamAPI_ISteamRemoteStorage_FileWrite(
 			self.0,
@@ -129,7 +139,7 @@ impl RemoteStorage {
 	pub fn publish_workshop_file(&mut self, contents_path: &str, preview_path: &str, title: &str, description: &str, tags: &[&str]) -> APICall {
 		let tags = Strings {
 			elements: tags.iter().map(|&s| CString::new(s).unwrap().as_ptr()).collect::<Vec<_>>().as_ptr(),
-			length: tags.len() as u32,
+			length: tags.len() as i32,
 		};
 
 		unsafe {SteamAPI_ISteamRemoteStorage_PublishWorkshopFile(
@@ -156,6 +166,15 @@ impl RemoteStorage {
 pub struct Utils(*mut UtilsImpl);
 
 impl Utils {
+	pub fn new() -> Result<Self, ()> {
+		let ptr = SteamUtils();
+		if ptr.is_null() {
+			Err(())
+		} else {
+			Ok(Utils(ptr))
+		}
+	}
+
 	pub fn is_apicall_completed(&self, call: APICall) -> bool {
 		let mut b = false;
 		unsafe { SteamAPI_ISteamUtils_IsAPICallCompleted(self.0, call, &mut b as *mut bool) }
@@ -180,64 +199,10 @@ impl Utils {
 	}
 }
 
-pub struct Client(*mut ClientImpl, User, Pipe);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ClientError {
-	NoSteam,
-	NoSteamPipe,
-	NoSteamClient,
-}
-
-impl fmt::Display for ClientError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		use self::ClientError::*;
-		write!(f, "{}", match *self {
-			NoSteam       => "laspad could not initialize SteamAPI",
-			NoSteamPipe   => "laspad could not create a pipe to steam.exe",
-			NoSteamClient => "laspad could not create SteamClient",
-		})
-	}
-}
-
-impl Client {
-	pub fn new() -> Result<Self, ClientError> {
-		if ! unsafe {SteamAPI_Init()} {
-			return Err(ClientError::NoSteam);
-		};
-
-		let pipe = unsafe { SteamAPI_GetHSteamPipe() };
-		let user = unsafe { SteamAPI_GetHSteamUser() };
-
-		if pipe == Pipe(0) {
-			return Err(ClientError::NoSteamPipe);
-		};
-
-		let client: *mut ClientImpl = unsafe { transmute(SteamInternal_CreateInterface(transmute("SteamClient017\0".as_ptr()))) };
-
-		if client as usize == 0 {
-			Err(ClientError::NoSteamClient)
-		} else {
-			Ok(Client(client, user, pipe))
-		}
-	}
-
-	pub fn remote_storage(&self) -> Result<RemoteStorage, ()> {
-		//println!("{:?}, {:?}, {:?}", self.0, self.1, self.2);
-		let storage = unsafe { SteamAPI_ISteamClient_GetISteamRemoteStorage(self.0, self.1, self.2, transmute("STEAMREMOTESTORAGE_INTERFACE_VERSION014\0".as_ptr())) };
-		if !storage.is_null() {
-			Ok(RemoteStorage(storage))
-		} else {
-			Err(())
-		}
-	}
-
-	pub fn utils(&self) -> Result<Utils, ()> {
-		let utils = unsafe { SteamAPI_ISteamClient_GetISteamUtils(self.0, self.2, transmute("SteamUtils009\0".as_ptr())) };
-		if !utils.is_null() {
-			Ok(Utils(utils))
-		} else {
-			Err(())
-		}
+pub fn init() -> Result<(), ()> {
+	if unsafe { SteamAPI_Init() } {
+		Ok(())
+	} else {
+		Err(())
 	}
 }

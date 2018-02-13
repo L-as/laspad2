@@ -124,15 +124,15 @@ pub fn main(branch_name: &str) {
 		unreachable!()
 	};
 
-	let client = steam::Client::new().unwrap_or_else(|e| {
+	steam::init().unwrap_or_else(|e| {
 		error!("{}", e);
 		exit(1)
 	});
-	let mut remote = client.remote_storage().unwrap_or_else(|_| {
+	let mut remote = steam::RemoteStorage::new().unwrap_or_else(|_| {
 		error!("Could not create SteamRemoteStorage");
 		exit(1)
 	});
-	let mut utils  = client.utils().unwrap_or_else(|_| {
+	let mut utils  = steam::Utils::new().unwrap_or_else(|_| {
 		error!("Could not create SteamUtils");
 		exit(1)
 	});
