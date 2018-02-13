@@ -37,14 +37,14 @@ use self::ns2_xml_format::Response as NS2XMLFormat;
 fn download(url: &str) -> Vec<u8> {
 	let mut buf = Vec::new();
 	let mut easy = ::curl::easy::Easy::new();
-	easy.url(url).unwrap();
+	easy.url(url).unwrap_or_else(|e| panic!("Could not set URL '{}': {}", url, e));
 	{
 		let mut transfer = easy.transfer();
 		transfer.write_function(|data| {
 			buf.extend_from_slice(data);
 			Ok(data.len())
-		}).unwrap();
-		transfer.perform().unwrap();
+		}).unwrap_or_else(|e| panic!("Could not set write function for URL '{}': {}", url, e));
+		transfer.perform().unwrap_or_else(|e| panic!("Could not perform transfer for URL '{}': {}", url, e));
 	}
 	buf
 }
@@ -65,7 +65,7 @@ pub fn specific(dep: &str) -> Result<()> {
 	let format: NS2XMLFormat = serde_xml_rs::deserialize(&*download(&format!(
 		"http://mods.ns2cdt.com/ISteamRemoteStorage/GetPublishedFileDetails/V0001?format=xml&publishedfileid={}",
 		modid
-	))).unwrap();
+	))).unwrap_or_else(|e| panic!("Could not deserialize XML for {}: {}", dep, e));
 
 	let path          = dep_path.join(".update_timestamp");
 	let local_update  = if path.exists() {
@@ -77,9 +77,9 @@ pub fn specific(dep: &str) -> Result<()> {
 	if local_update < remote_update {
 		println!("Local workshop item {} copy is outdated, {} < {}", dep, local_update, remote_update);
 		File::create(path)?.write_u64::<LE>(remote_update)?;
-		let mut archive = ZipArchive::new(Cursor::new(download(&format.publishedfiledetails.publishedfile.file_url))).unwrap();
+		let mut archive = ZipArchive::new(Cursor::new(download(&format.publishedfiledetails.publishedfile.file_url))).unwrap_or_else(|e| panic!("Could not read zip archive for {}: {}", dep, e));
 		for i in 0..archive.len() {
-			let mut file = archive.by_index(i).unwrap();
+			let mut file = archive.by_index(i).unwrap_or_else(|e| panic!("Could not access file in zip archive for {}: {}", dep, e));
 			let path = dep_path.join(file.name());
 			fs::create_dir_all(path.parent().unwrap())?;
 			let mut buf = Vec::new();
@@ -98,7 +98,7 @@ pub fn main() -> Result<()> {
 	let dependencies = Path::new("dependencies");
 	if dependencies.exists() {
 		for dependency in fs::read_dir(dependencies)? {
-			specific(&dependency?.file_name().into_string().unwrap())?;
+			specific(&dependency?.file_name().into_string().unwrap_or_else(|e| panic!("Could not access name for dependency: {:?}", e)))?;
 		};
 	};
 	Ok(())
