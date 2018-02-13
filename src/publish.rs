@@ -124,8 +124,8 @@ pub fn main(branch_name: &str) {
 		unreachable!()
 	};
 
-	steam::init().unwrap_or_else(|e| {
-		error!("{}", e);
+	steam::init().unwrap_or_else(|_| {
+		error!("laspad could not initialize Steam API");
 		exit(1)
 	});
 	let mut remote = steam::RemoteStorage::new().unwrap_or_else(|_| {
@@ -213,25 +213,31 @@ pub fn main(branch_name: &str) {
 	};
 
 	println!("Requesting workshop item update");
-	let apicall = remote.update_workshop_file(item)
-		.title(&branch.name)
-		.and_then(|u| u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()))
-		.and_then(|u| u.description(&description))
-		.and_then(|u| u.preview("laspad_preview"))
-		.and_then(|u| u.contents("laspad_mod.zip"))
-		.and_then(|u| if Path::new(".git").exists() {
-			let repo = Repository::open(".").expect("Could not open git repo!");
-			let head = repo.head().unwrap();
-			let oid = head.peel_to_commit().unwrap().id();
-			u.change_description(&format!("git commit: {}", oid))
-		} else {
-			Ok(u)
-		})
-		.map(|u| u.commit())
-		.unwrap_or_else(|_| {
-			error!("Could not request update for mod!");
-			exit(1)
-		});
+	let u = remote.update_workshop_file(item);
+	if u.title(&branch.name).is_err() {
+		error!("Could not update title");
+	};
+	if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
+		error!("Could not update tags");
+	};
+	if u.description(&description).is_err() {
+		error!("Could not update description");
+	};
+	if u.preview("laspad_preview").is_err() {
+		error!("Could not update preview");
+	};
+	if u.contents("laspad_mod.zip").is_err() {
+		error!("Could not update zip");
+	};
+	if Path::new(".git").exists() {
+		let repo = Repository::open(".").expect("Could not open git repo!");
+		let head = repo.head().unwrap();
+		let oid = head.peel_to_commit().unwrap().id();
+		if u.change_description(&format!("git commit: {}", oid)).is_err() {
+			error!("Could not update version history");
+		};
+	};
+	let apicall = u.commit();
 
 	let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
 
