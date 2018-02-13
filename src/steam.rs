@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use std::ffi::CString;
-use std::mem::{size_of, transmute, zeroed};
+use std::ffi::{CString, CStr};
+use std::mem::{forget, size_of, transmute, zeroed};
 use std::fmt;
 
 include!("steam_ffi.rs");
@@ -59,9 +59,14 @@ pub struct ItemUpdater<'a> {
 
 impl<'a> ItemUpdater<'a> {
 	pub fn tags(&self, tags: &[&str]) -> Result<&Self, ()> {
+		let tags: Vec<*const i8> = tags.iter().map(|&s| {
+			let s = CString::new(s).unwrap();
+			let ptr = s.as_ptr() as *const i8;
+			forget(s); // yeah....
+			ptr
+		}).collect();
 		let tags = Strings {
-			//elements: tags.iter().map(|&s| CString::new(s).unwrap().as_ptr()).collect::<Vec<_>>().as_ptr(),
-			elements: &["ABC".as_ptr() as *const i8, "DEF".as_ptr() as *const i8] as *const *const i8,
+			elements: tags.as_slice().as_ptr() as *const *const i8,
 			length: tags.len() as i32,
 		};
 
@@ -115,7 +120,7 @@ pub struct RemoteStorage(*mut RemoteStorageImpl);
 
 impl RemoteStorage {
 	pub fn new() -> Result<Self, ()> {
-		let ptr = SteamRemoteStorage();
+		let ptr = unsafe {SteamRemoteStorage()};
 		if ptr.is_null() {
 			Err(())
 		} else {
@@ -167,7 +172,7 @@ pub struct Utils(*mut UtilsImpl);
 
 impl Utils {
 	pub fn new() -> Result<Self, ()> {
-		let ptr = SteamUtils();
+		let ptr = unsafe {SteamUtils()};
 		if ptr.is_null() {
 			Err(())
 		} else {
