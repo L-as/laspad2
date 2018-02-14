@@ -6,16 +6,16 @@ license = "GPLv3"
 publish = false
 
 [dependencies]
-regex             = "*"
-toml              = "*"
 clap              = {version = "2", features = ["color"]}
-curl              = "*"
+lazy_static       = "1"
 serde             = "1"
 serde_derive      = "1"
-serde-xml-rs      = "*"
 byteorder         = "1"
+serde-xml-rs      = "*"
 zip               = "*"
 log               = "*"
 pretty_env_logger = "*"
-lazy_static       = "1"
 git2              = "*"
+regex             = "*"
+toml              = "*"
+curl              = "*"

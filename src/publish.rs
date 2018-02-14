@@ -159,24 +159,31 @@ pub fn main(branch_name: &str) {
 	println!("Zipping up files");
 	let zip = Vec::new();
 	let zip = {
+		use std::cell::RefCell;
+
 		let mut cursor = Cursor::new(zip);
-		let mut zip    = zip::ZipWriter::new(cursor);
+		let mut zip    = RefCell::new(zip::ZipWriter::new(cursor));
 
 		let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-		zip.start_file(".modinfo", options).unwrap();
-		zip.write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
+		zip.get_mut().start_file(".modinfo", options).unwrap();
+		zip.get_mut().write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
 
 		compile::iterate_files(&Path::new("."), &mut |path, rel_path| {
 			trace!("{:?} < {:?}", rel_path, path);
-			zip.start_file("rel_path", options).unwrap();
+			let mut zip = zip.borrow_mut();
+			zip.start_file(rel_path.to_str().unwrap(), options).unwrap();
 			let mut buf = Vec::new();
 			File::open(path).expect("Could not open file!").read_to_end(&mut buf).expect("Could not read file!");
 			zip.write_all(&buf).expect("Could not write to zip archive!");
 			Ok(())
-		}).expect("Could not find files to publish!");
+		}, &mut |rel_path| {
+			trace!("--- {:?} ---", rel_path);
+			zip.borrow_mut().add_directory(rel_path.to_str().unwrap(), options).unwrap();
+			Ok(())
+		}).unwrap();
 
-		zip.finish().unwrap().into_inner()
+		zip.get_mut().finish().unwrap().into_inner()
 	};
 
 	println!("Finished preparing preview and description");

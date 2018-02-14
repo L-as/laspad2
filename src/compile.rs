@@ -4,16 +4,20 @@ use std::path::Path;
 
 type Result = io::Result<()>;
 
-fn iterate_dir<F>(root: &Path, path: &Path, f: &mut F) -> Result
-	where F: FnMut(&Path, &Path) -> Result
+fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
+	where
+	F: FnMut(&Path, &Path) -> Result,
+	G: FnMut(&Path)        -> Result
 {
 	for entry in fs::read_dir(path).expect("Attempted to read non-existent directory!") {
 		let entry = &entry.expect("Could not access file").path();
 		if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
+			let rel = entry.strip_prefix(root).unwrap();
 			if entry.is_dir() {
-				iterate_dir(root, entry, f)?;
+				g(rel)?;
+				iterate_dir(root, entry, f, g)?;
 			} else {
-				f(entry, entry.strip_prefix(root).unwrap())?;
+				f(entry, rel)?;
 			};
 		} else {
 			debug!("Ignored file {:?}", entry);
@@ -22,21 +26,23 @@ fn iterate_dir<F>(root: &Path, path: &Path, f: &mut F) -> Result
 	Ok(())
 }
 
-pub fn iterate_files<F>(path: &Path, f: &mut F) -> Result
-	where F: FnMut(&Path, &Path) -> Result
+pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
+	where
+	F: FnMut(&Path, &Path) -> Result,
+	G: FnMut(&Path)        -> Result
 {
 
 	if path.join(".update_timestamp").exists() {
 		debug!(".update_timestamp exists in {:?}", path);
-		iterate_dir(path, path, f)?;
+		iterate_dir(path, path, f, g)?;
 	} else if path.join("laspad.toml").exists() {
 		debug!("laspad.toml exists in {:?}", path);
 		let src = &path.join("src");
-		iterate_dir(src, src, f)?;
+		iterate_dir(src, src, f, g)?;
 		let dependencies = path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
-				iterate_files(&dependency?.path(), f)?;
+				iterate_files(&dependency?.path(), f, g)?;
 			};
 		};
 	} else if path.join("mod.settings").exists() {
@@ -50,10 +56,10 @@ pub fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 		let source = path.join(&SOURCE_RE.captures(modsettings).unwrap()[1]);
 		let output = path.join(&OUTPUT_RE.captures(modsettings).unwrap()[1]);
 		if source.exists() {
-			iterate_dir(&source, &source, f)?;
+			iterate_dir(&source, &source, f, g)?;
 		};
 		if output.exists() {
-			iterate_dir(&source, &source, f)?;
+			iterate_dir(&source, &source, f, g)?;
 		};
 	} else { // just guess
 		debug!("Guessing source directory in {:?}", path);
@@ -67,11 +73,11 @@ pub fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 			if source_dir.exists() {
 				found = true;
 				trace!("Found {:?} in {:?}", source_dir, path);
-				iterate_dir(source_dir, source_dir, f)?;
+				iterate_dir(source_dir, source_dir, f, g)?;
 			};
 		};
 		if !found {
-			iterate_dir(path, path, f)?;
+			iterate_dir(path, path, f, g)?;
 		};
 	};
 	Ok(())
@@ -88,10 +94,6 @@ pub fn main() -> Result {
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
 		trace!("{:?} < {:?}", rel_path, path);
 		let dest = dest.join(rel_path);
-		match dest.parent() {
-			Some(parent) => fs::create_dir_all(parent).expect("Couldn't create necessary directories for file"),
-			None         => {},
-		};
 		if let Err(e) = fs::hard_link(path, dest) {
 			if e.kind() == io::ErrorKind::AlreadyExists {
 				warn!("Multiple mods have file {:?}!", rel_path);
@@ -102,5 +104,11 @@ pub fn main() -> Result {
 		} else {
 			Ok(())
 		}
+	}, &mut |rel_path| {
+		trace!("--- {:?} ---", rel_path);
+		fs::create_dir_all(dest.join(rel_path)).unwrap_or_else(|e| {
+			panic!("Could not create directory {:?}: {:?}", rel_path, e);
+		});
+		Ok(())
 	})
 }
