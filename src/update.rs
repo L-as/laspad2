@@ -76,7 +76,6 @@ pub fn specific(dep: &str) -> Result<()> {
 	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
 	if local_update < remote_update {
 		println!("Local workshop item {} copy is outdated, {} < {}", dep, local_update, remote_update);
-		File::create(path)?.write_u64::<LE>(remote_update)?;
 		let mut archive = ZipArchive::new(Cursor::new(download(&format.publishedfiledetails.publishedfile.file_url))).unwrap_or_else(|e| panic!("Could not read zip archive for {}: {:?}", dep, e));
 		for i in 0..archive.len() {
 			let mut file = archive.by_index(i).unwrap_or_else(|e| panic!("Could not access file in zip archive for {}: {:?}", dep, e));
@@ -86,6 +85,7 @@ pub fn specific(dep: &str) -> Result<()> {
 			file.read_to_end(&mut buf)?;
 			File::create(path)?.write_all(&buf)?;
 		};
+		File::create(path)?.write_u64::<LE>(remote_update)?;
 	} else {
 		println!("Local workshop item {} copy is up-to-date", dep);
 	};
