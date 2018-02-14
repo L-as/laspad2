@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::ffi::{CString, CStr};
+use std::ffi::CString;
 use std::mem::{forget, size_of, transmute, zeroed};
 use std::fmt;
 
