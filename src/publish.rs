@@ -179,7 +179,7 @@ pub fn main(branch_name: &str) {
 			Ok(())
 		}, &mut |rel_path| {
 			trace!("--- {:?} ---", rel_path);
-			zip.borrow_mut().add_directory(rel_path.to_str().unwrap(), options).unwrap();
+			//zip.borrow_mut().add_directory(rel_path.to_str().unwrap(), options).unwrap();
 			Ok(())
 		}).unwrap();
 
