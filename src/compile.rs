@@ -49,17 +49,27 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 		debug!("mod.settings exists in {:?}", path);
 		use regex::Regex;
 		lazy_static! {
-			static ref SOURCE_RE: Regex = Regex::new(r#"^\s*source_dir\s*=\s*".*?""#).unwrap();
-			static ref OUTPUT_RE: Regex = Regex::new(r#"^\s*output_dir\s*=\s*".*?""#).unwrap();
+			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
+			static ref OUTPUT_RE: Regex = Regex::new(r#"output_dir\s*=\s*"(.*?)""#).unwrap();
 		}
 		let modsettings = &String::from_utf8(File::open(path.join("mod.settings"))?.bytes().map(|b| b.unwrap()).collect()).unwrap();
-		let source = path.join(&SOURCE_RE.captures(modsettings).unwrap()[1]);
-		let output = path.join(&OUTPUT_RE.captures(modsettings).unwrap()[1]);
-		if source.exists() {
-			iterate_dir(&source, &source, f, g)?;
+		let mut found = false;
+		if let Some(captures) = SOURCE_RE.captures(modsettings) {
+			let source = path.join(&captures[1]);
+			if source.exists() {
+				found = true;
+				iterate_dir(&source, &source, f, g)?;
+			};
 		};
-		if output.exists() {
-			iterate_dir(&source, &source, f, g)?;
+		if let Some(captures) = OUTPUT_RE.captures(modsettings) {
+			let output = path.join(&captures[1]);
+			if output.exists() {
+				found = true;
+				iterate_dir(&output, &output, f, g)?;
+			};
+		};
+		if !found {
+			warn!("Found no source directory in {:?}", path);
 		};
 	} else { // just guess
 		debug!("Guessing source directory in {:?}", path);
