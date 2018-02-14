@@ -53,19 +53,21 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			static ref OUTPUT_RE: Regex = Regex::new(r#"output_dir\s*=\s*"(.*?)""#).unwrap();
 		}
 		let modsettings = &String::from_utf8(File::open(path.join("mod.settings"))?.bytes().map(|b| b.unwrap()).collect()).unwrap();
-		let mut found = false;
+		let mut found  = false;
+		let mut source = None;
 		if let Some(captures) = SOURCE_RE.captures(modsettings) {
-			let source = path.join(&captures[1]);
-			if source.exists() {
+			let s = path.join(&captures[1]);
+			if s.exists() {
 				found = true;
-				iterate_dir(&source, &source, f, g)?;
+				iterate_dir(&s, &s, f, g)?;
 			};
+			source = Some(s.clone());
 		};
 		if let Some(captures) = OUTPUT_RE.captures(modsettings) {
-			let output = path.join(&captures[1]);
-			if output.exists() {
+			let s = path.join(&captures[1]);
+			if s.exists() && source.is_none() || &s != &source.unwrap() {
 				found = true;
-				iterate_dir(&output, &output, f, g)?;
+				iterate_dir(&s, &s, f, g)?;
 			};
 		};
 		if !found {
