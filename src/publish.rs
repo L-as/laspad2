@@ -6,6 +6,7 @@ use std::process::exit;
 use steam::{SteamResult, self};
 use update;
 use compile;
+use md_to_bb;
 
 use zip;
 
@@ -196,16 +197,21 @@ pub fn main(branch_name: &str) {
 		preview.push(0);
 	};
 
-	let mut description = if branch.autodescription {
-		generate_description(item.0)
-	} else {
-		String::new()
-	};
-
+	let mut description = String::new();
 	File::open(&*branch.description).and_then(|mut f| f.read_to_string(&mut description)).unwrap_or_else(|e| {
 		error!("Could not read description: {}", e);
 		exit(1)
 	});
+
+	let description = md_to_bb::convert(&description);
+
+	let description = if branch.autodescription {
+		let mut s = generate_description(item.0);
+		s.push_str(&description);
+		s
+	} else {
+		description
+	};
 
 	println!("Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {

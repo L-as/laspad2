@@ -28,6 +28,7 @@ mod need;
 mod update;
 mod compile;
 mod publish;
+mod md_to_bb;
 
 use std::process::exit;
 use std::path::Path;
