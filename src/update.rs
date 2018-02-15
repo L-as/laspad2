@@ -81,18 +81,20 @@ pub fn specific(dep: &str) -> Result<()> {
 		if cfg!(target_os = "windows") {
 			use std::process::Command;
 			use std::env::current_exe;
-			use std::io;
 
 			let path = dep_path.join(".mod.zip");
 			File::create(&path).unwrap().write_all(&buf).unwrap();
-			let _ = io::stdout().write(&Command::new("cscript")
+			let status = Command::new("cscript")
 				.arg("//B")
 				.arg(current_exe().unwrap().join("unzip.vbs"))
 				.arg(&path)
 				.arg(dep_path)
-				.output()
-				.unwrap_or_else(|e| panic!("Could not read zip archive for {} @ {}: {:?}", dep, url, e))
-				.stdout);
+				.status()
+				.unwrap();
+
+			if !status.success() {
+				panic!("Could not read zip archive for {} @ {}: {}", dep, url, status);
+			};
 		} else {
 			let mut archive = ZipArchive::new(Cursor::new(buf)).unwrap_or_else(|e| panic!("Could not read zip archive for {} @ {}: {:?}", dep, url, e));
 			for i in 0..archive.len() {
