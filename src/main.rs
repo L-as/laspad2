@@ -86,9 +86,14 @@ vice versa.")
 	if matches.subcommand_name() == Some("init") {
 		init::main().unwrap();
 	} else {
-		if !Path::new("laspad.toml").exists() {
-			error!("This is not a laspad project!");
-			exit(1);
+		while !Path::new("laspad.toml").exists() {
+			use std::env;
+			if let Some(parent) = env::current_dir().unwrap().parent() {
+				env::set_current_dir(&parent).unwrap();
+			} else {
+				error!("This is not a laspad project!");
+				exit(1);
+			};
 		};
 
 		match matches.subcommand() {
