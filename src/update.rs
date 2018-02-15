@@ -60,7 +60,7 @@ pub fn specific(dep: &str) -> Result<()> {
 	let modid = modid.unwrap();
 
 	debug!("{} is a workshop item", dep);
-	let dep_path = Path::new("dependencies").join(dep);
+	let dep_path = &Path::new("dependencies").join(dep);
 
 	let format: NS2XMLFormat = serde_xml_rs::deserialize(&*download(&format!(
 		"http://mods.ns2cdt.com/ISteamRemoteStorage/GetPublishedFileDetails/V0001?format=xml&publishedfileid={}",
@@ -76,6 +76,17 @@ pub fn specific(dep: &str) -> Result<()> {
 	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
 	if local_update < remote_update {
 		println!("Local workshop item {} copy is outdated, {} < {}", dep, local_update, remote_update);
+		for entry in fs::read_dir(dep_path).unwrap() {
+			let entry = &entry.unwrap().path();
+			if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
+				if entry.is_dir() {
+					fs::remove_dir_all(entry).unwrap();
+				} else {
+					fs::remove_file(entry).unwrap();
+				};
+			};
+		};
+
 		let url = &format.publishedfiledetails.publishedfile.file_url;
 		let buf = download(url);
 		if cfg!(target_os = "windows") {
