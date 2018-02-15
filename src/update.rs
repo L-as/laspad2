@@ -86,7 +86,7 @@ pub fn specific(dep: &str) -> Result<()> {
 			File::create(&path).unwrap().write_all(&buf).unwrap();
 			let status = Command::new("cscript")
 				.arg("//B")
-				.arg(current_exe().unwrap().join("unzip.vbs"))
+				.arg(current_exe().unwrap().parent().unwrap().join("unzip.vbs"))
 				.arg(&path)
 				.arg(dep_path)
 				.status()
