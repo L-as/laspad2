@@ -76,15 +76,32 @@ pub fn specific(dep: &str) -> Result<()> {
 	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
 	if local_update < remote_update {
 		println!("Local workshop item {} copy is outdated, {} < {}", dep, local_update, remote_update);
-		let mut archive = ZipArchive::new(Cursor::new(download(&format.publishedfiledetails.publishedfile.file_url))).unwrap_or_else(|e| panic!("Could not read zip archive for {}: {:?}", dep, e));
-		for i in 0..archive.len() {
-			let mut file = archive.by_index(i).unwrap_or_else(|e| panic!("Could not access file in zip archive for {}: {:?}", dep, e));
-			let path = dep_path.join(file.name());
-			fs::create_dir_all(path.parent().unwrap())?;
-			let mut buf = Vec::new();
-			file.read_to_end(&mut buf)?;
-			File::create(path)?.write_all(&buf)?;
-		};
+		let url = &format.publishedfiledetails.publishedfile.file_url;
+		let buf = download(url);
+		if cfg!(target_os = "windows") {
+			use std::process::Command;
+			use std::env::current_exe;
+
+			let path = dep_path.join("mod.zip");
+			File::create(&path).unwrap().write_all(&buf).unwrap();
+			Command::new("cscript")
+				.arg("//B")
+				.arg(current_exe().unwrap().join("unzip.vbs"))
+				.arg(&path)
+				.arg(dep_path)
+				.output()
+				.unwrap_or_else(|e| panic!("Could not read zip archive for {} @ {}: {:?}", dep, url, e));
+		} else {
+			let mut archive = ZipArchive::new(Cursor::new(buf)).unwrap_or_else(|e| panic!("Could not read zip archive for {} @ {}: {:?}", dep, url, e));
+			for i in 0..archive.len() {
+				let mut file = archive.by_index(i).unwrap_or_else(|e| panic!("Could not access file in zip archive for {}: {:?}", dep, e));
+				let path = dep_path.join(file.name());
+				fs::create_dir_all(path.parent().unwrap())?;
+				let mut buf = Vec::new();
+				file.read_to_end(&mut buf)?;
+				File::create(path)?.write_all(&buf)?;
+			};
+		}
 		File::create(path)?.write_u64::<LE>(remote_update)?;
 	} else {
 		println!("Local workshop item {} copy is up-to-date", dep);
