@@ -1,5 +1,6 @@
 #![feature(extern_types)]
 #![allow(safe_packed_borrows)]
+#![deny(unused_must_use)]
 
 #[macro_use]
 extern crate clap;
