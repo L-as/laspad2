@@ -82,7 +82,7 @@ pub fn specific(dep: &str) -> Result<()> {
 			use std::process::Command;
 			use std::env::current_exe;
 
-			let path = dep_path.join("mod.zip");
+			let path = dep_path.join(".mod.zip");
 			File::create(&path).unwrap().write_all(&buf).unwrap();
 			Command::new("cscript")
 				.arg("//B")

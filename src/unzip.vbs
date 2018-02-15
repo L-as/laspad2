@@ -1,7 +1,8 @@
-Dim argin  = WScript.Arguments(0)
-Dim argout = WScript.Arguments(1)
+set fso = CreateObject("Scripting.FileSystemObject")
+src = fso.GetAbsolutePathName(WScript.Arguments(0))
+dst = fso.GetAbsolutePathName(WScript.Arguments(1))
 
-Set sh = CreateObject( "Shell.Application" )
-Set src = sh.NameSpace(argin).Items()
-Set dst = sh.NameSpace(argout)
+set sh = CreateObject("Shell.Application")
+set src = sh.NameSpace(src).Items()
+set dst = sh.NameSpace(dst)
 dst.CopyHere src, 256
