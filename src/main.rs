@@ -68,6 +68,7 @@ vice versa.")
 		(@subcommand publish =>
 			(about: "Updates dependencies and then publishes the mod to workshop")
 			(@arg BRANCH: "The branch to publish, defaults to master")
+			(@arg RETRY: -r --retry "Retry until success")
 		)
 		//(@subcommand launch =>
 		// 	(about: "Launches an external spark program with this mod")
@@ -101,7 +102,7 @@ vice versa.")
 			("need",    Some(m)) => {need::   main(m.value_of("MODID" ).unwrap()).unwrap()},
 			("update",  Some(_)) => {update:: main().unwrap()},
 			("compile", Some(_)) => {compile::main().unwrap()},
-			("publish", Some(m)) => {publish::main(m.value_of("BRANCH").unwrap_or("master"))},
+			("publish", Some(m)) => {publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"))},
 			_                       => {
 				unreachable!();
 			},

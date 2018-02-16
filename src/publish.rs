@@ -107,7 +107,7 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 	}
 }
 
-pub fn main(branch_name: &str) {
+pub fn main(branch_name: &str, retry: bool) {
 	let mut buf = String::new();
 	File::open("laspad.toml").unwrap().read_to_string(&mut buf).unwrap();
 
@@ -225,39 +225,53 @@ pub fn main(branch_name: &str) {
 		exit(1)
 	};
 
-	println!("Requesting workshop item update");
-	let u = remote.update_workshop_file(item);
-	if u.title(&branch.name).is_err() {
-		error!("Could not update title");
-	};
-	if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
-		error!("Could not update tags");
-	};
-	if u.description(&description).is_err() {
-		error!("Could not update description");
-	};
-	if u.preview("laspad_preview").is_err() {
-		error!("Could not update preview");
-	};
-	if u.contents("laspad_mod.zip").is_err() {
-		error!("Could not update zip");
-	};
-	if Path::new(".git").exists() {
-		let repo = Repository::open(".").expect("Could not open git repo!");
-		let head = repo.head().unwrap();
-		let oid = head.peel_to_commit().unwrap().id();
-		if u.change_description(&format!("git commit: {}", oid)).is_err() {
-			error!("Could not update version history");
+	let mut request_update = || {
+		println!("Requesting workshop item update");
+		let u = remote.update_workshop_file(item);
+		if u.title(&branch.name).is_err() {
+			error!("Could not update title");
 		};
+		if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
+			error!("Could not update tags");
+		};
+		if u.description(&description).is_err() {
+			error!("Could not update description");
+		};
+		if u.preview("laspad_preview").is_err() {
+			error!("Could not update preview");
+		};
+		if u.contents("laspad_mod.zip").is_err() {
+			error!("Could not update zip");
+		};
+		if Path::new(".git").exists() {
+			let repo = Repository::open(".").expect("Could not open git repo!");
+			let head = repo.head().unwrap();
+			let oid = head.peel_to_commit().unwrap().id();
+			if u.change_description(&format!("git commit: {}", oid)).is_err() {
+				error!("Could not update version history");
+			};
+		};
+		let apicall = u.commit();
+
+		let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
+
+		if result.result == SteamResult::OK {
+			println!("Published mod: {:X}", result.item.0);
+			true
+		} else {
+			error!("Could not publish mod: {:?}", result.result);
+			false
+		}
 	};
-	let apicall = u.commit();
 
-	let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
-
-	if result.result == SteamResult::OK {
-		println!("Published mod: {:X}", result.item.0);
+	if retry {
+		while !request_update() {
+			use std::{thread::sleep, time::Duration};
+			sleep(Duration::from_millis(1000));
+		};
 	} else {
-		error!("Could not publish mod: {:?}", result.result);
-		exit(1)
+		if !request_update() {
+			exit(1)
+		};
 	};
 }
