@@ -267,7 +267,7 @@ pub fn main(branch_name: &str, retry: bool) {
 	if retry {
 		while !request_update() {
 			use std::{thread::sleep, time::Duration};
-			sleep(Duration::from_millis(1000));
+			sleep(Duration::from_secs(5));
 		};
 	} else {
 		if !request_update() {
