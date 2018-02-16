@@ -56,7 +56,7 @@ pub fn generate_description(modid: u64) -> String {
 				}
 
 				let mut buf = String::new();
-				File::open(path.join(".modinfo")).expect("Couldn't read .modinfo file!").read_to_string(&mut buf).unwrap();
+				File::open(path.join(".modinfo")).unwrap_or_else(|e| panic!("Couldn't read .modinfo file for {}: {:?}", &name, e)).read_to_string(&mut buf).unwrap();
 				let modinfo: ModInfo = toml::from_str(&buf).unwrap();
 
 				let url = format!("http://steamcommunity.com/sharedfiles/filedetails/?id={}", modid);
