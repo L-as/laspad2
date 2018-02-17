@@ -1,13 +1,18 @@
-use std::process::exit;
 use std::fs::{self, File, OpenOptions};
-use std::io::{Result, Write};
+use std::io::{Write};
 use std::path::Path;
+use failure::*;
 
-pub fn main() -> Result<()> {
-	if File::open("laspad.toml").is_ok() {
-		eprintln!("This is already a laspad project!");
-		exit(1);
-	};
+#[derive(Debug, Fail)]
+enum InitError {
+	#[fail(display = "This is already a laspad project!")]
+	AlreadyExists,
+}
+
+type Result = ::std::result::Result<(), Error>;
+
+pub fn main() -> Result {
+	ensure!(!Path::new("laspad.toml").exists(), InitError::AlreadyExists);
 
 	File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;
 

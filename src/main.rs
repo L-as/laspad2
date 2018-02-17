@@ -1,4 +1,5 @@
 #![feature(extern_types)]
+#![feature(fs_read_write)]
 #![allow(safe_packed_borrows)]
 #![deny(unused_must_use)]
 
@@ -10,6 +11,8 @@ extern crate serde_derive;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate failure;
 
 extern crate toml;
 extern crate serde;
@@ -20,8 +23,13 @@ extern crate curl;
 extern crate regex;
 extern crate pretty_env_logger;
 extern crate git2;
+extern crate web_view as webview;
+extern crate urlencoding;
+extern crate nfd;
 
 mod steam;
+mod md_to_bb;
+mod ui;
 
 // console commands
 mod init;
@@ -29,16 +37,15 @@ mod need;
 mod update;
 mod compile;
 mod publish;
-mod md_to_bb;
 
 use std::process::exit;
 use std::path::Path;
+use std::env;
 
 fn main() {
-	//steam::init().unwrap_or_else(|_| {
-	//	eprintln!("Could not initialise Steam API!");
-	//	exit(1);
-	//});
+	if env::var_os("RUST_LOG").is_none() {
+		env::set_var("RUST_LOG", "laspad=info")
+	};
 
 	pretty_env_logger::init();
 
@@ -46,7 +53,7 @@ fn main() {
 		(version: crate_version!())
 		(author:  "las <las@protonmail.ch>")
 		(about:   "Replacement of Launch Pad for Natural Selection 2, i.e. can publish mods to workshop.")
-		(@setting SubcommandRequiredElseHelp)
+		//(@setting SubcommandRequiredElseHelp)
 		(@setting VersionlessSubcommands)
 		(@subcommand init =>
 		 	(about: "Initialises laspad in the current directory")
@@ -85,27 +92,38 @@ vice versa.")
 		//)
 	).get_matches();
 
-	if matches.subcommand_name() == Some("init") {
-		init::main().unwrap();
+	if matches.subcommand_name() == None {
+		ui::main();
 	} else {
-		while !Path::new("laspad.toml").exists() {
-			use std::env;
-			if let Some(parent) = env::current_dir().unwrap().parent() {
-				env::set_current_dir(&parent).unwrap();
-			} else {
-				error!("This is not a laspad project!");
+		if matches.subcommand_name() == Some("init") {
+			if let Err(e) = init::main() {
+				error!("{}", e);
 				exit(1);
 			};
-		};
+		} else {
+			while !Path::new("laspad.toml").exists() {
+				if let Some(parent) = env::current_dir().unwrap().parent() {
+					env::set_current_dir(&parent).unwrap();
+				} else {
+					error!("This is not a laspad project!");
+					exit(1);
+				};
+			};
 
-		match matches.subcommand() {
-			("need",    Some(m)) => {need::   main(m.value_of("MODID" ).unwrap()).unwrap()},
-			("update",  Some(_)) => {update:: main().unwrap()},
-			("compile", Some(_)) => {compile::main().unwrap()},
-			("publish", Some(m)) => {publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"))},
-			_                       => {
-				unreachable!();
-			},
+			let stdout = &mut ::std::io::stdout();
+
+			if let Err(e) = match matches.subcommand() {
+				("need",    Some(m)) => need::   main(m.value_of("MODID" ).unwrap(), stdout),
+				("update",  Some(_)) => update:: main(stdout),
+				("compile", Some(_)) => compile::main(stdout),
+				("publish", Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), stdout),
+				_                    => {
+					unreachable!();
+				},
+			} {
+				error!("{}", e);
+				exit(1);
+			};
 		};
 	};
 }

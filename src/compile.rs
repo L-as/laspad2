@@ -1,8 +1,10 @@
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::Path;
+use std::cell::RefCell;
+use failure::*;
 
-type Result = io::Result<()>;
+type Result = ::std::result::Result<(), Error>;
 
 fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
 	where
@@ -12,7 +14,7 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
 	for entry in fs::read_dir(path).expect("Attempted to read non-existent directory!") {
 		let entry = &entry.expect("Could not access file").path();
 		if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
-			let rel = entry.strip_prefix(root).unwrap();
+			let rel = entry.strip_prefix(root)?;
 			if entry.is_dir() {
 				g(rel)?;
 				iterate_dir(root, entry, f, g)?;
@@ -26,7 +28,7 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
 	Ok(())
 }
 
-pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
+pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, output: &RefCell<&mut Write>) -> Result
 	where
 	F: FnMut(&Path, &Path) -> Result,
 	G: FnMut(&Path)        -> Result
@@ -42,7 +44,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 		let dependencies = path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
-				iterate_files(&dependency?.path(), f, g)?;
+				iterate_files(&dependency?.path(), f, g, output)?;
 			};
 		};
 	} else if path.join("mod.settings").exists() {
@@ -52,7 +54,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
 			static ref OUTPUT_RE: Regex = Regex::new(r#"output_dir\s*=\s*"(.*?)""#).unwrap();
 		}
-		let modsettings = &String::from_utf8(File::open(path.join("mod.settings"))?.bytes().map(|b| b.unwrap()).collect()).unwrap();
+		let modsettings = &String::from_utf8(File::open(path.join("mod.settings"))?.bytes().map(|b| b.unwrap()).collect())?;
 		let mut found  = false;
 		let mut source = None;
 		if let Some(captures) = SOURCE_RE.captures(modsettings) {
@@ -71,7 +73,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			};
 		};
 		if !found {
-			warn!("Found no source directory in {:?}", path);
+			let _ = writeln!(output.borrow_mut(), "Found no source directory in {:?}", path);
 		};
 	} else { // just guess
 		debug!("Guessing source directory in {:?}", path);
@@ -95,7 +97,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 	Ok(())
 }
 
-pub fn main() -> Result {
+pub fn main(output: &mut Write) -> Result {
 	let dest = Path::new("compiled");
 
 	if dest.exists() {
@@ -103,24 +105,26 @@ pub fn main() -> Result {
 		fs::create_dir(dest).expect("Couldn't create directory 'compiled'");
 	}
 
+	let output = RefCell::new(output);
+
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
 		trace!("{:?} < {:?}", rel_path, path);
 		let dest = dest.join(rel_path);
 		if let Err(e) = fs::hard_link(path, dest) {
 			if e.kind() == io::ErrorKind::AlreadyExists {
-				warn!("Multiple mods have file {:?}!", rel_path);
+				let _ = writeln!(output.borrow_mut(), "Multiple mods have file {:?}!", rel_path);
 				Ok(())
 			} else {
-				Err(e)
+				bail!(e);
 			}
 		} else {
 			Ok(())
 		}
 	}, &mut |rel_path| {
 		trace!("--- {:?} ---", rel_path);
-		fs::create_dir_all(dest.join(rel_path)).unwrap_or_else(|e| {
-			panic!("Could not create directory {:?}: {:?}", rel_path, e);
-		});
+		fs::create_dir_all(dest.join(rel_path)).with_context(|_| {
+			format!("Could not create directory {}", rel_path.display())
+		})?;
 		Ok(())
-	})
+	}, &output)
 }

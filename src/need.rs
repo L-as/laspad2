@@ -1,34 +1,39 @@
 use std::fs::{self, File, OpenOptions};
-use std::process::exit;
-use std::io::{Result, Write};
+use std::io::Write;
 use std::path::{PathBuf, Path};
+use failure::*;
 
 use update;
 
-pub fn main(dep: &str) -> Result<()> {
-	fs::create_dir_all("dependencies").expect("Could not create 'dependencies' directory");
+#[derive(Debug, Fail)]
+pub enum NeedError {
+	#[fail(display = "Dependency already exists")]
+	AlreadyExists,
+}
+
+type Result = ::std::result::Result<(), Error>;
+
+pub fn main(dep: &str, output: &mut Write) -> Result {
+	fs::create_dir_all("dependencies")?;
 
 	let dep = dep.to_uppercase();
 
 	trace!("add {}", dep);
 
 	let path = PathBuf::from(format!("dependencies/{}", dep));
-	if path.exists() {
-		error!("Dependency already exists!");
-		exit(1);
-	};
+	ensure!(!path.exists(), NeedError::AlreadyExists);
 
-	fs::create_dir(&path).expect("Could not create directory for dependency");
-	File::create(path.join(".laspad_dummy")).expect("Could not create .laspad_dummy file");
-	update::specific(&dep).expect("Could not update dependency");
+	fs::create_dir(&path)?;
+	File::create(path.join(".laspad_dummy"))?;
+	update::specific(&dep, output)?;
 
 	if Path::new(".git").exists() {
 		OpenOptions::new()
 			.create(true)
 			.append(true)
-			.open(".gitignore").expect("Could not open/create .gitignore file")
+			.open(".gitignore")?
 			.write_all(format!("/dependencies/{}/*\n!/dependencies/{}/.laspad_dummy\n", dep, dep).as_bytes())?;
-	}
+	};
 
 	Ok(())
 }

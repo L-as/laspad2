@@ -1,18 +1,40 @@
 use std::path::{Path, PathBuf};
 use std::fs::{self, File};
 use std::io::{Read, Write, Cursor};
-use std::process::exit;
+use std::result::Result as StdResult;
+use failure::*;
+use zip;
+use git2::Repository;
+use toml;
 
-use steam::{SteamResult, self};
+use steam::{Error as SteamError, self};
 use update;
 use compile;
 use md_to_bb;
 
-use zip;
+#[derive(Debug, Fail)]
+pub enum PublishError {
+	#[fail(display = "Could not publish dummy file to steam")]
+	DummyFile,
+	#[fail(display = "Branch {} does not exist", branch)]
+	NonexistentBranch {
+		branch: String
+	},
+	#[fail(display = "Could not initialize Steam API")]
+	NoSteam,
+	#[fail(display = "Could not create SteamRemoteStorage API interface")]
+	NoSteamRemoteStorage,
+	#[fail(display = "Could not create SteamUtils API interface")]
+	NoSteamUtils,
+	#[fail(display = "Could not upload zip file to remote storage")]
+	CantUploadMod,
+	#[fail(display = "Could not upload preview to remote storage")]
+	CantUploadPreview,
+	#[fail(display = "Could not update zip file used")]
+	CantUpdateMod,
+}
 
-use git2::Repository;
-
-use toml;
+type Result<T> = ::std::result::Result<T, Error>;
 
 #[derive(Deserialize)]
 struct Branch {
@@ -23,18 +45,18 @@ struct Branch {
 	preview:         Box<str>,
 }
 
-pub fn generate_description(modid: u64) -> String {
+pub fn generate_description(modid: u64) -> Result<String> {
 	let mut s: String = format!(
 		"[b]Mod ID: {:X}[/b]\n\n",
 		modid
 	);
 
 	if Path::new(".git").exists() {
-		let repo = Repository::open(".").unwrap();
+		let repo = Repository::open(".")?;
 		if let Ok(origin) = repo.find_remote("origin") {
 			let origin = origin.url().unwrap();
-			let head   = repo.head().unwrap();
-			let oid    = head.peel_to_commit().unwrap().id();
+			let head   = repo.head()?;
+			let oid    = head.peel_to_commit()?.id();
 			s.push_str(&format!(
 				"[b][url={}]git repository[/url][/b]\ncurrent git commit: {}\n\n",
 				origin,
@@ -46,9 +68,9 @@ pub fn generate_description(modid: u64) -> String {
 	if Path::new("dependencies").exists() {
 		s.push_str("Mods included: [list]\n");
 		for dependency in fs::read_dir("dependencies").expect("Couldn't read dependencies directory") {
-			let dependency = dependency.unwrap();
+			let dependency = dependency?;
 			let path       = dependency.path();
-			let name       = dependency.file_name().into_string().unwrap();
+			let name       = dependency.file_name().into_string().expect("Invalid UTF-8");
 			let (name, url) = if let Ok(modid) = u64::from_str_radix(&name, 16) {
 				#[derive(Deserialize)]
 				struct ModInfo {
@@ -56,15 +78,15 @@ pub fn generate_description(modid: u64) -> String {
 				}
 
 				let mut buf = String::new();
-				File::open(path.join(".modinfo")).unwrap_or_else(|e| panic!("Couldn't read .modinfo file for {}: {:?}", &name, e)).read_to_string(&mut buf).unwrap();
-				let modinfo: ModInfo = toml::from_str(&buf).unwrap();
+				File::open(path.join(".modinfo")).with_context(|_| format!("Couldn't read .modinfo file for {}", &name))?.read_to_string(&mut buf)?;
+				let modinfo: ModInfo = toml::from_str(&buf)?;
 
 				let url = format!("http://steamcommunity.com/sharedfiles/filedetails/?id={}", modid);
 
 				(modinfo.name, url.into_boxed_str())
 			} else if path.join(".git").exists() {
-				let repo   = Repository::open(path).unwrap();
-				let origin = repo.find_remote("origin").unwrap();
+				let repo   = Repository::open(path)?;
+				let origin = repo.find_remote("origin")?;
 				let url    = origin.url().unwrap();
 
 				(name.into_boxed_str(), String::from(url).into_boxed_str())
@@ -80,14 +102,11 @@ pub fn generate_description(modid: u64) -> String {
 		s.push_str("[/list]\n\n");
 	};
 
-	s
+	Ok(s)
 }
 
-fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Utils) -> steam::Item {
-	remote.file_write("laspad_mod.zip", &[0 as u8]).unwrap_or_else(|_| {
-		error!("Could not upload dummy file");
-		exit(1)
-	});
+fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Utils) -> Result<steam::Item> {
+	ensure!(remote.file_write("laspad_mod.zip", &[0 as u8]).is_ok(), PublishError::DummyFile);
 
 	let apicall = remote.publish_workshop_file(
 		"laspad_mod.zip",
@@ -99,65 +118,47 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 
 	let result = utils.get_apicall_result::<steam::PublishItemResult>(apicall);
 
-	if result.result == SteamResult::OK {
-		result.item
-	} else {
-		error!("Could not publish mod: {:?}", result.result);
-		exit(1)
-	}
+	Ok(StdResult::<_, _>::from(result.result).and(Ok(result.item))?)
 }
 
-pub fn main(branch_name: &str, retry: bool) {
+pub fn main(branch_name: &str, retry: bool, output: &mut Write) -> Result<()> {
 	let mut buf = String::new();
-	File::open("laspad.toml").unwrap().read_to_string(&mut buf).unwrap();
+	File::open("laspad.toml")?.read_to_string(&mut buf)?;
 
-	let toml: toml::Value = buf.parse().unwrap();
+	let toml: toml::Value = buf.parse()?;
 
 	let branch: Branch = if let toml::Value::Table(mut t) = toml {
-		t.remove(branch_name).unwrap_or_else(|| {
-			error!("Branch {} does not exist!", branch_name);
-			exit(1)
-		}).try_into().unwrap_or_else(|e| {
-			error!("Could not deserialize laspad.toml: {}", e);
-			exit(1)
-		})
+		match t.remove(branch_name) {
+			Some(b) => b,
+			None    => bail!(PublishError::NonexistentBranch { branch: branch_name.to_owned() }),
+		}.try_into().unwrap()
 	} else {
 		unreachable!()
 	};
 
-	steam::init().unwrap_or_else(|_| {
-		error!("laspad could not initialize Steam API");
-		exit(1)
-	});
-	let mut remote = steam::RemoteStorage::new().unwrap_or_else(|_| {
-		error!("Could not create SteamRemoteStorage");
-		exit(1)
-	});
-	let mut utils  = steam::Utils::new().unwrap_or_else(|_| {
-		error!("Could not create SteamUtils");
-		exit(1)
-	});
+	ensure!(steam::init().is_ok(), PublishError::NoSteam);
+	let mut remote = match steam::RemoteStorage::new() {
+		Ok(r) => r,
+		Err(_) => bail!(PublishError::NoSteamRemoteStorage),
+	};
+	let mut utils  = match steam::Utils::new() {
+		Ok(r) => r,
+		Err(_) => bail!(PublishError::NoSteamUtils),
+	};
 
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
-		let mut buf = String::new();
-		File::open(&modid_file).and_then(|mut f| f.read_to_string(&mut buf)).unwrap_or_else(|e| {
-			error!("Could not read {:?}: {}", modid_file, e);
-			exit(1)
-		});
-		steam::Item(u64::from_str_radix(&buf, 16).unwrap())
+		steam::Item(u64::from_str_radix(&fs::read_string(&modid_file).context("Could not read the modid file")?, 16)?)
 	} else {
-		let item = create_workshop_item(&mut remote, &mut utils);
-		println!("Created Mod ID: {:X}", item.0);
-		File::create(&modid_file).and_then(|mut f| f.write_all(format!("{:X}", item.0).as_bytes())).unwrap_or_else(|_| {
-			error!("Could not write {:X} to {:?}", item.0, modid_file);
-		});
+		let item = create_workshop_item(&mut remote, &mut utils)?;
+		let _ = writeln!(output, "Created Mod ID: {:X}", item.0);
+		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
 
-	update::main().unwrap();
+	update::main(output)?;
 
-	println!("Zipping up files");
+	let _ = writeln!(output, "Zipping up files");
 	let zip = Vec::new();
 	let zip = {
 		use std::cell::RefCell;
@@ -167,111 +168,105 @@ pub fn main(branch_name: &str, retry: bool) {
 
 		let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-		zip.get_mut().start_file(".modinfo", options).unwrap();
+		zip.get_mut().start_file(".modinfo", options)?;
 		zip.get_mut().write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
 
 		compile::iterate_files(&Path::new("."), &mut |path, rel_path| {
 			trace!("{:?} < {:?}", rel_path, path);
 			let mut zip = zip.borrow_mut();
-			zip.start_file(rel_path.to_str().unwrap(), options).unwrap();
+			zip.start_file(rel_path.to_str().unwrap(), options)?;
 			let mut buf = Vec::new();
 			File::open(path).expect("Could not open file!").read_to_end(&mut buf).expect("Could not read file!");
 			zip.write_all(&buf).expect("Could not write to zip archive!");
 			Ok(())
 		}, &mut |rel_path| {
 			trace!("--- {:?} ---", rel_path);
-			//zip.borrow_mut().add_directory(rel_path.to_str().unwrap(), options).unwrap();
+			//zip.borrow_mut().add_directory(rel_path.to_str()?, options)?;
 			Ok(())
-		}).unwrap();
+		}, &RefCell::new(output))?;
 
-		zip.get_mut().finish().unwrap().into_inner()
+		zip.get_mut().finish()?.into_inner()
 	};
 
-	println!("Finished preparing preview and description");
-	let mut preview = Vec::new();
-	File::open(&*branch.preview).and_then(|mut f| f.read_to_end(&mut preview)).unwrap_or_else(|e| {
-		error!("Could not read preview: {}", e);
-		exit(1);
-	});
+	let _ = writeln!(output, "Finished preparing preview and description");
+	let mut preview = fs::read(&*branch.preview).context("Could not read preview")?;
 	if preview.len() == 0 { // Steam craps itself when it has 0 length
 		preview.push(0);
 	};
 
-	let mut description = String::new();
-	File::open(&*branch.description).and_then(|mut f| f.read_to_string(&mut description)).unwrap_or_else(|e| {
-		error!("Could not read description: {}", e);
-		exit(1)
-	});
-
-	let description = md_to_bb::convert(&description);
+	let description = md_to_bb::convert(&fs::read_string(&*branch.description).context("Could not read description")?);
 
 	let description = if branch.autodescription {
-		let mut s = generate_description(item.0);
+		let mut s = generate_description(item.0)?;
 		s.push_str(&description);
 		s
 	} else {
 		description
 	};
 
-	println!("Uploading zip");
+	let _ = writeln!(output, "Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
-		error!("Could not write mod file to steam!");
-		exit(1)
+		bail!(PublishError::CantUploadMod);
 	};
 
-	println!("Uploading preview");
+	let _ = writeln!(output, "Uploading preview");
 	if remote.file_write("laspad_preview", &preview).is_err() {
-		error!("Could not write preview file to steam!");
-		exit(1)
+		bail!(PublishError::CantUploadPreview);
 	};
 
 	let mut request_update = || {
-		println!("Requesting workshop item update");
+		let _ = writeln!(output, "Requesting workshop item update");
 		let u = remote.update_workshop_file(item);
 		if u.title(&branch.name).is_err() {
-			error!("Could not update title");
+			let _ = writeln!(output, "Could not update title");
 		};
 		if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
-			error!("Could not update tags");
+			let _ = writeln!(output, "Could not update tags");
 		};
 		if u.description(&description).is_err() {
-			error!("Could not update description");
+			let _ = writeln!(output, "Could not update description");
 		};
 		if u.preview("laspad_preview").is_err() {
-			error!("Could not update preview");
+			let _ = writeln!(output, "Could not update preview");
 		};
 		if u.contents("laspad_mod.zip").is_err() {
-			error!("Could not update zip");
+			bail!(PublishError::CantUpdateMod);
 		};
 		if Path::new(".git").exists() {
 			let repo = Repository::open(".").expect("Could not open git repo!");
-			let head = repo.head().unwrap();
-			let oid = head.peel_to_commit().unwrap().id();
+			let head = repo.head()?;
+			let oid = head.peel_to_commit()?.id();
 			if u.change_description(&format!("git commit: {}", oid)).is_err() {
-				error!("Could not update version history");
+				let _ = writeln!(output, "Could not update version history");
 			};
 		};
 		let apicall = u.commit();
 
 		let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
 
-		if result.result == SteamResult::OK {
-			println!("Published mod: {:X}", result.item.0);
-			true
-		} else {
-			error!("Could not publish mod: {:?}", result.result);
-			false
-		}
+		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item.0));
+		if let Ok(item) = result {
+			let _ = writeln!(output, "Published mod: {:X}", item);
+		};
+
+		Ok(result?)
 	};
 
 	if retry {
-		while !request_update() {
-			use std::{thread::sleep, time::Duration};
-			sleep(Duration::from_secs(5));
+		while let Err(e) = request_update() {
+			match e.downcast::<SteamError>() {
+				Ok(e) => if e == SteamError::Busy {
+					use std::{thread::sleep, time::Duration};
+					sleep(Duration::from_secs(5));
+				} else {
+					bail!(e);
+				},
+				Err(e) => bail!(e),
+			};
 		};
 	} else {
-		if !request_update() {
-			exit(1)
-		};
+		request_update()?;
 	};
+
+	Ok(())
 }

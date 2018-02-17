@@ -2,6 +2,7 @@
 
 use std::ffi::CString;
 use std::mem::{forget, size_of, transmute, zeroed};
+use std::error;
 use std::fmt;
 
 include!("steam_ffi.rs");

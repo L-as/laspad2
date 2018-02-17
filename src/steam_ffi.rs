@@ -1,7 +1,20 @@
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SteamResult(u32);
+
+impl From<SteamResult> for Result<(), Error> {
+	fn from(sr: SteamResult) -> Self {
+		use std::mem::transmute;
+
+		match sr {
+			SteamResult(1) => Ok(()),
+			SteamResult(n) => Err(unsafe{transmute(n)}),
+		}
+	}
+}
+
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SteamResult {
-	OK                                      = 1,
+pub enum Error {
 	Fail                                    = 2,
 	NoConnection                            = 3,
 	InvalidPassword                         = 5,
@@ -110,6 +123,18 @@ pub enum SteamResult {
 	TooManyPending                          = 108,
 	NoSiteLicensesFound                     = 109,
 	WGNetworkSendExceeded                   = 110,
+}
+
+impl fmt::Display for Error {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		fmt::Debug::fmt(&self, f)
+	}
+}
+
+impl error::Error for Error {
+	fn description(&self) -> &str {
+		"<N/A>"
+	}
 }
 
 #[repr(C)]
