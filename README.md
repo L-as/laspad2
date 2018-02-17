@@ -6,6 +6,10 @@ Check help.txt for help.
 
 Thanks to @GhoulofGSG9 for explaining the undocumented steam api!
 
+# License
+
+Everything except libsteam\_api.so and steam\_api.dll is covered by the license in LICENSE.md
+
 # Configuration
 Configuration is made in TOML.
 
