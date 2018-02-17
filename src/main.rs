@@ -111,12 +111,13 @@ vice versa.")
 			};
 
 			let stdout = &mut ::std::io::stdout();
+			let stderr = &mut ::std::io::stderr();
 
 			if let Err(e) = match matches.subcommand() {
 				("need",    Some(m)) => need::   main(m.value_of("MODID" ).unwrap(), stdout),
 				("update",  Some(_)) => update:: main(stdout),
-				("compile", Some(_)) => compile::main(stdout),
-				("publish", Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), stdout),
+				("compile", Some(_)) => compile::main(stderr),
+				("publish", Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), stdout, stderr),
 				_                    => {
 					unreachable!();
 				},

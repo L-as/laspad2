@@ -28,7 +28,7 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
 	Ok(())
 }
 
-pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, output: &RefCell<&mut Write>) -> Result
+pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, output_err: &RefCell<&mut Write>) -> Result
 	where
 	F: FnMut(&Path, &Path) -> Result,
 	G: FnMut(&Path)        -> Result
@@ -44,7 +44,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, output: &RefCell<&
 		let dependencies = path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
-				iterate_files(&dependency?.path(), f, g, output)?;
+				iterate_files(&dependency?.path(), f, g, output_err)?;
 			};
 		};
 	} else if path.join("mod.settings").exists() {
@@ -73,7 +73,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, output: &RefCell<&
 			};
 		};
 		if !found {
-			let _ = writeln!(output.borrow_mut(), "Found no source directory in {:?}", path);
+			let _ = writeln!(output_err.borrow_mut(), "Found no source directory in {:?}", path);
 		};
 	} else { // just guess
 		debug!("Guessing source directory in {:?}", path);
@@ -97,7 +97,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, output: &RefCell<&
 	Ok(())
 }
 
-pub fn main(output: &mut Write) -> Result {
+pub fn main(output_err: &mut Write) -> Result {
 	let dest = Path::new("compiled");
 
 	if dest.exists() {
@@ -105,14 +105,14 @@ pub fn main(output: &mut Write) -> Result {
 		fs::create_dir(dest).expect("Couldn't create directory 'compiled'");
 	}
 
-	let output = RefCell::new(output);
+	let output_err = RefCell::new(output_err);
 
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
 		trace!("{:?} < {:?}", rel_path, path);
 		let dest = dest.join(rel_path);
 		if let Err(e) = fs::hard_link(path, dest) {
 			if e.kind() == io::ErrorKind::AlreadyExists {
-				let _ = writeln!(output.borrow_mut(), "Multiple mods have file {:?}!", rel_path);
+				let _ = writeln!(output_err.borrow_mut(), "Multiple mods have file {:?}!", rel_path);
 				Ok(())
 			} else {
 				bail!(e);
@@ -126,5 +126,5 @@ pub fn main(output: &mut Write) -> Result {
 			format!("Could not create directory {}", rel_path.display())
 		})?;
 		Ok(())
-	}, &output)
+	}, &output_err)
 }

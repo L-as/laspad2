@@ -121,7 +121,7 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 	Ok(StdResult::<_, _>::from(result.result).and(Ok(result.item))?)
 }
 
-pub fn main(branch_name: &str, retry: bool, output: &mut Write) -> Result<()> {
+pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut Write) -> Result<()> {
 	let mut buf = String::new();
 	File::open("laspad.toml")?.read_to_string(&mut buf)?;
 
@@ -183,7 +183,7 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write) -> Result<()> {
 			trace!("--- {:?} ---", rel_path);
 			//zip.borrow_mut().add_directory(rel_path.to_str()?, options)?;
 			Ok(())
-		}, &RefCell::new(output))?;
+		}, &RefCell::new(output_err))?;
 
 		zip.get_mut().finish()?.into_inner()
 	};
@@ -218,16 +218,16 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write) -> Result<()> {
 		let _ = writeln!(output, "Requesting workshop item update");
 		let u = remote.update_workshop_file(item);
 		if u.title(&branch.name).is_err() {
-			let _ = writeln!(output, "Could not update title");
+			let _ = writeln!(output_err, "Could not update title");
 		};
 		if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
-			let _ = writeln!(output, "Could not update tags");
+			let _ = writeln!(output_err, "Could not update tags");
 		};
 		if u.description(&description).is_err() {
-			let _ = writeln!(output, "Could not update description");
+			let _ = writeln!(output_err, "Could not update description");
 		};
 		if u.preview("laspad_preview").is_err() {
-			let _ = writeln!(output, "Could not update preview");
+			let _ = writeln!(output_err, "Could not update preview");
 		};
 		if u.contents("laspad_mod.zip").is_err() {
 			bail!(PublishError::CantUpdateMod);
@@ -237,7 +237,7 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write) -> Result<()> {
 			let head = repo.head()?;
 			let oid = head.peel_to_commit()?.id();
 			if u.change_description(&format!("git commit: {}", oid)).is_err() {
-				let _ = writeln!(output, "Could not update version history");
+				let _ = writeln!(output_err, "Could not update version history");
 			};
 		};
 		let apicall = u.commit();
