@@ -174,10 +174,8 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut
 		compile::iterate_files(&Path::new("."), &mut |path, rel_path| {
 			trace!("{:?} < {:?}", rel_path, path);
 			let mut zip = zip.borrow_mut();
-			zip.start_file(rel_path.to_str().unwrap(), options)?;
-			let mut buf = Vec::new();
-			File::open(path).expect("Could not open file!").read_to_end(&mut buf).expect("Could not read file!");
-			zip.write_all(&buf).expect("Could not write to zip archive!");
+			zip.start_file(rel_path.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
+			zip.write_all(&fs::read(path)?).expect("Could not write to zip archive!");
 			Ok(())
 		}, &mut |rel_path| {
 			trace!("--- {:?} ---", rel_path);
