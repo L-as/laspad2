@@ -40,8 +40,12 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, output_err: &RefCe
 	} else if path.join("laspad.toml").exists() {
 		debug!("laspad.toml exists in {:?}", path);
 		let src = &path.join("src");
-		iterate_dir(src, src, f, g)?;
-		let dependencies = path.join("dependencies");
+		if src.exists() {
+			iterate_dir(src, src, f, g)?;
+		} else {
+			let _ = writeln!(output_err.borrow_mut(), "Found no source directory in {}", path.display());
+		};
+		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
 				iterate_files(&dependency?.path(), f, g, output_err)?;
