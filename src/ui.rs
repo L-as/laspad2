@@ -31,8 +31,10 @@ pub fn init<T>(webview: &mut WebView<T>, _: &mut T) -> Result<()> {
 pub fn main() -> Result<()> {
 	let url = "data:text/html,".to_string() + &urlencoding::encode(HTML);
 	let (_userdata, success) = webview::run("laspad", &url, Some((640, 640)), /*resizable*/ true, /*debug*/ true, |webview| {
-		webview.dispatch(|webview, userdata| init(webview, userdata).unwrap());
-		thread::sleep(Duration::from_millis(100));
+		thread::spawn(move || {
+			webview.dispatch(|webview, userdata| init(webview, userdata).unwrap());
+			thread::sleep(Duration::from_millis(100));
+		});
 	}, |webview, arg, userdata| {
 		println!("callback: {}", arg);
 		match arg {
