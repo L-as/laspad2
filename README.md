@@ -1,5 +1,4 @@
 # About
-
 This is a tool to publish and manage NS2 mods.
 
 Check help.txt for help.
@@ -7,8 +6,7 @@ Check help.txt for help.
 Thanks to @GhoulofGSG9 for explaining the undocumented steam api!
 
 # License
-
-Everything except libsteam\_api.so and steam\_api.dll is covered by the license in LICENSE.md
+Everything except what is in the `3rdparty` directory is covered by the license in LICENSE.md.
 
 # Configuration
 Configuration is made in TOML.
