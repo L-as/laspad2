@@ -9,7 +9,7 @@ type Result<T> = ::std::result::Result<T, Error>;
 pub fn init<T>(webview: &mut WebView<T>, _: &mut T) -> Result<()> {
 	println!("init");
 	webview.inject_css(CSS);
-	webview.eval(JQUERY);
+	webview.eval(ZEPTO);
 	webview.eval(JS);
 	fn get_file<T>(webview: &mut WebView<T>) -> Result<PathBuf> {
 		match nfd::open_pick_folder(None)? {
@@ -52,4 +52,4 @@ pub fn main() -> Result<()> {
 const HTML:   &'static str = include_str!("ui.html");
 const CSS:    &'static str = include_str!("ui.css");
 const JS:     &'static str = include_str!("ui.js");
-const JQUERY: &'static str = include_str!(concat!(env!("OUT_DIR"), "/jquery.js"));
+const ZEPTO:  &'static str = include_str!("../3rdparty/zepto.min.js");

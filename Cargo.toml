@@ -23,6 +23,3 @@ curl              = "*"
 web-view          = "*"
 nfd               = "*"
 failure           = "*"
-
-[build-dependencies]
-curl = "*"
