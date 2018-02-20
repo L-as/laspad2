@@ -93,7 +93,10 @@ vice versa.")
 	).get_matches();
 
 	if matches.subcommand_name() == None {
-		ui::main();
+		if let Err(e) = ui::main() {
+			error!("UI encountered fatal error: {}", e);
+			exit(1);
+		};
 	} else {
 		if matches.subcommand_name() == Some("init") {
 			if let Err(e) = init::main() {
