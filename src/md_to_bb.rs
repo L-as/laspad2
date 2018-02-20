@@ -1,10 +1,10 @@
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 lazy_static! {
 	static ref LINK:   Regex = Regex::new(r#"\[(.*?)\]\((.*?)\)"#).unwrap();
-	static ref CODE3:  Regex = Regex::new(r#"```(.*?)```"#       ).unwrap();
-	static ref CODE2:  Regex = Regex::new(r#"``(.*?)``"#         ).unwrap();
+	static ref CODE3:  Regex = RegexBuilder::new(r#"```(.*?)```"#).multi_line(true).dot_matches_new_line(true).build().unwrap();
+	static ref CODE2:  Regex = RegexBuilder::new(r#"``(.*?)``"#  ).multi_line(true).dot_matches_new_line(true).build().unwrap();
 	static ref CODE1:  Regex = Regex::new(r#"`(.*?)`"#           ).unwrap();
 	static ref H2:     Regex = Regex::new(r#"(^|\n)##(.*)"#      ).unwrap();
 	static ref H1:     Regex = Regex::new(r#"(^|\n)#(.*)"#       ).unwrap();
@@ -30,7 +30,9 @@ pub fn convert(s: &str) -> String {
 fn test() {
 	assert_eq!(convert("\
 [my url](google.com)
-```a```
+```
+a
+```
 ``a``
 `a`
 ###test
@@ -41,7 +43,9 @@ fn test() {
 ~~strike~~
 "), "\
 [url=google.com]my url[/url]
-[code]a[/code]
+[code]
+a
+[/code]
 [code]a[/code]
 [code]a[/code]
 [b]#test[/b]
