@@ -88,33 +88,15 @@ pub fn specific(dep: &str, output: &mut Write) -> Result<()> {
 
 		let url = &format.publishedfiledetails.publishedfile.file_url;
 		let buf = download(url)?;
-		if cfg!(target_os = "windows") {
-			use std::process::Command;
-			use std::env::current_exe;
-
-			let path = dep_path.join(".mod.zip");
-			File::create(&path)?.write_all(&buf)?;
-			let status = Command::new("cscript")
-				.arg("//B")
-				.arg(current_exe()?.parent().unwrap().join("unzip.vbs"))
-				.arg(&path)
-				.arg(dep_path)
-				.status()?;
-
-			if !status.success() {
-				panic!("Could not read zip archive for {} @ {}: {}", dep, url, status);
-			};
-		} else {
-			let mut archive = ZipArchive::new(Cursor::new(buf)).with_context(|_| format!("Could not read zip archive for {} @ {}", dep, url))?;
-			for i in 0..archive.len() {
-				let mut file = archive.by_index(i).with_context(|_| format!("Could not access file in zip archive for {}", dep))?;
-				let path = dep_path.join(file.name());
-				fs::create_dir_all(path.parent().unwrap())?;
-				let mut buf = Vec::new();
-				file.read_to_end(&mut buf)?;
-				File::create(path)?.write_all(&buf)?;
-			};
-		}
+		let mut archive = ZipArchive::new(Cursor::new(buf)).with_context(|_| format!("Could not read zip archive for {} @ {}", dep, url))?;
+		for i in 0..archive.len() {
+			let mut file = archive.by_index(i).with_context(|_| format!("Could not access file in zip archive for {}", dep))?;
+			let path = dep_path.join(file.name());
+			fs::create_dir_all(path.parent().unwrap())?;
+			let mut buf = Vec::new();
+			file.read_to_end(&mut buf)?;
+			File::create(path)?.write_all(&buf)?;
+		};
 		File::create(path)?.write_u64::<LE>(remote_update)?;
 	} else {
 		let _ = writeln!(output, "Local workshop item {} copy is up-to-date", dep);
