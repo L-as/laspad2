@@ -212,3 +212,7 @@ pub fn init() -> Result<(), ()> {
 		Err(())
 	}
 }
+
+pub fn deinit() {
+	unsafe { SteamAPI_Shutdown() }
+}

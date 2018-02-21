@@ -170,6 +170,7 @@ extern "C" {
 	type ClientImpl;
 
 	fn SteamAPI_Init() -> bool;
+	fn SteamAPI_Shutdown();
 
 	fn SteamRemoteStorage() -> *mut RemoteStorageImpl;
 	fn SteamUtils()         -> *mut UtilsImpl;

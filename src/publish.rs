@@ -266,5 +266,7 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut
 		request_update()?;
 	};
 
+	steam::deinit();
+
 	Ok(())
 }
