@@ -12,8 +12,8 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G, log: &Log) 
 	F: FnMut(&Path, &Path) -> Result,
 	G: FnMut(&Path)        -> Result
 {
-	for entry in fs::read_dir(path).expect("Attempted to read non-existent directory!") {
-		let entry = &entry.expect("Could not access file").path();
+	for entry in fs::read_dir(path)? {
+		let entry = &entry?.path();
 		if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
 			let rel = entry.strip_prefix(root)?;
 			if entry.is_dir() {
@@ -106,8 +106,8 @@ pub fn main(log: &Log) -> Result {
 	let dest = Path::new("compiled");
 
 	if dest.exists() {
-		fs::remove_dir_all(dest).expect("Couldn't remove directory 'compiled'");
-		fs::create_dir(dest).expect("Couldn't create directory 'compiled'");
+		fs::remove_dir_all(dest)?;
+		fs::create_dir(dest)?;
 	}
 
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
