@@ -173,13 +173,13 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 		zip.get_mut().write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
 
 		compile::iterate_files(&Path::new("."), &mut |path, rel_path| {
-			log!(log, 2; "{:?} < {:?}", rel_path, path);
+			log!(log, 2; "{} < {}", rel_path.display(), path.display());
 			let mut zip = zip.borrow_mut();
 			zip.start_file(rel_path.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
 			zip.write_all(&fs::read(path)?).expect("Could not write to zip archive!");
 			Ok(())
 		}, &mut |rel_path| {
-			log!(log, 2; "--- {:?} ---", rel_path);
+			log!(log, 2; "--- {} ---", rel_path.display());
 			//zip.borrow_mut().add_directory(rel_path.to_str()?, options)?;
 			Ok(())
 		}, log)?;
