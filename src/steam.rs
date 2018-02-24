@@ -187,7 +187,10 @@ impl Utils {
 	}
 
 	pub fn get_apicall_result<T: APICallResult + fmt::Debug>(&self, call: APICall) -> T {
-		while !self.is_apicall_completed(call) {};
+		while !self.is_apicall_completed(call) {
+			use std::{thread, time::Duration};
+			thread::sleep(Duration::from_millis(200));
+		};
 
 		let mut result: T = unsafe { zeroed() };
 
