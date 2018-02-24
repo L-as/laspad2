@@ -11,6 +11,7 @@ use steam::{Error as SteamError, self};
 use update;
 use compile;
 use md_to_bb;
+use logger::*;
 
 #[derive(Debug, Fail)]
 pub enum PublishError {
@@ -121,7 +122,7 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 	Ok(StdResult::<_, _>::from(result.result).and(Ok(result.item))?)
 }
 
-pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut Write) -> Result<()> {
+pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 	let mut buf = String::new();
 	File::open("laspad.toml")?.read_to_string(&mut buf)?;
 
@@ -151,14 +152,14 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut
 		steam::Item(u64::from_str_radix(&fs::read_string(&modid_file).context("Could not read the modid file")?, 16)?)
 	} else {
 		let item = create_workshop_item(&mut remote, &mut utils)?;
-		let _ = writeln!(output, "Created Mod ID: {:X}", item.0);
+		log!(log; "Created Mod ID: {:X}", item.0);
 		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
 
-	update::main(output)?;
+	update::main(log)?;
 
-	let _ = writeln!(output, "Zipping up files");
+	log!(log; "Zipping up files");
 	let zip = Vec::new();
 	let zip = {
 		use std::cell::RefCell;
@@ -172,21 +173,21 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut
 		zip.get_mut().write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
 
 		compile::iterate_files(&Path::new("."), &mut |path, rel_path| {
-			trace!("{:?} < {:?}", rel_path, path);
+			log!(log, 2; "{:?} < {:?}", rel_path, path);
 			let mut zip = zip.borrow_mut();
 			zip.start_file(rel_path.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
 			zip.write_all(&fs::read(path)?).expect("Could not write to zip archive!");
 			Ok(())
 		}, &mut |rel_path| {
-			trace!("--- {:?} ---", rel_path);
+			log!(log, 2; "--- {:?} ---", rel_path);
 			//zip.borrow_mut().add_directory(rel_path.to_str()?, options)?;
 			Ok(())
-		}, &RefCell::new(output_err))?;
+		}, log)?;
 
 		zip.get_mut().finish()?.into_inner()
 	};
 
-	let _ = writeln!(output, "Finished preparing preview and description");
+	log!(log; "Finished preparing preview and description");
 	let mut preview = fs::read(&*branch.preview).context("Could not read preview")?;
 	if preview.len() == 0 { // Steam craps itself when it has 0 length
 		preview.push(0);
@@ -202,30 +203,30 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut
 		description
 	};
 
-	let _ = writeln!(output, "Uploading zip");
+	log!(log; "Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
 		bail!(PublishError::CantUploadMod);
 	};
 
-	let _ = writeln!(output, "Uploading preview");
+	log!(log; "Uploading preview");
 	if remote.file_write("laspad_preview", &preview).is_err() {
 		bail!(PublishError::CantUploadPreview);
 	};
 
 	let mut request_update = || {
-		let _ = writeln!(output, "Requesting workshop item update");
+		log!(log; "Requesting workshop item update");
 		let u = remote.update_workshop_file(item);
 		if u.title(&branch.name).is_err() {
-			let _ = writeln!(output_err, "Could not update title");
+			elog!(log; "Could not update title");
 		};
 		if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
-			let _ = writeln!(output_err, "Could not update tags");
+			elog!(log; "Could not update tags");
 		};
 		if u.description(&description).is_err() {
-			let _ = writeln!(output_err, "Could not update description");
+			elog!(log; "Could not update description");
 		};
 		if u.preview("laspad_preview").is_err() {
-			let _ = writeln!(output_err, "Could not update preview");
+			elog!(log; "Could not update preview");
 		};
 		if u.contents("laspad_mod.zip").is_err() {
 			bail!(PublishError::CantUpdateMod);
@@ -235,7 +236,7 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut
 			let head = repo.head()?;
 			let oid = head.peel_to_commit()?.id();
 			if u.change_description(&format!("git commit: {}", oid)).is_err() {
-				let _ = writeln!(output_err, "Could not update version history");
+				elog!(log; "Could not update version history");
 			};
 		};
 		let apicall = u.commit();
@@ -244,7 +245,7 @@ pub fn main(branch_name: &str, retry: bool, output: &mut Write, output_err: &mut
 
 		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item.0));
 		if let Ok(item) = result {
-			let _ = writeln!(output, "Published mod: {:X}", item);
+			log!(log; "Published mod: {:X}", item);
 		};
 
 		Ok(result?)

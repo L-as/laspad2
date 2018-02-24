@@ -44,8 +44,7 @@ pub fn main() -> Result<()> {
 		};
 	}, 0);
 	if !success {
-		error!("Webview failed");
-		exit(1)
+		bail!("Webview failed");
 	};
 
 	Ok(())

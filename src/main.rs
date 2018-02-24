@@ -8,8 +8,6 @@ extern crate clap;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate failure;
@@ -21,15 +19,17 @@ extern crate byteorder;
 extern crate zip;
 extern crate curl;
 extern crate regex;
-extern crate pretty_env_logger;
 extern crate git2;
 extern crate web_view as webview;
 extern crate urlencoding;
 extern crate nfd;
+extern crate termcolor;
 
 mod steam;
 mod md_to_bb;
 mod ui;
+#[macro_use]
+mod logger;
 
 // console commands
 mod init;
@@ -40,14 +40,16 @@ mod publish;
 
 use std::process::exit;
 use std::path::Path;
+use std::io::Write;
+use std::cell::RefCell;
 use std::env;
+
+use termcolor::{StandardStream, ColorChoice, ColorSpec, Color, WriteColor};
 
 fn main() {
 	if env::var_os("RUST_LOG").is_none() {
 		env::set_var("RUST_LOG", "laspad=info")
 	};
-
-	pretty_env_logger::init();
 
 	let matches = clap_app!(laspad =>
 		(version: crate_version!())
@@ -92,15 +94,45 @@ vice versa.")
 		//)
 	).get_matches();
 
+	struct StdLog<'a> {
+		min_priority: i64,
+		stdout: RefCell<&'a mut Write>,
+		stderr: RefCell<&'a mut Write>,
+	}
+
+	impl<'a> logger::Log for StdLog<'a> {
+		fn write(&self, priority: i64, line: &str) {
+			if priority < self.min_priority {return};
+
+			if priority > 0 {
+				let _ = self.stderr.borrow_mut().write_all(line.as_bytes());
+			} else {
+				let _ = self.stdout.borrow_mut().write_all(line.as_bytes());
+			};
+		}
+	}
+
+	let mut stdout = StandardStream::stdout(ColorChoice::Auto);
+	let mut stderr = StandardStream::stderr(ColorChoice::Auto);
+	if stderr.supports_color() {
+		let _ = stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
+	};
+
+	let log = &mut StdLog {
+		stdout: RefCell::new(&mut stdout),
+		stderr: RefCell::new(&mut stderr),
+		min_priority: env::var("LASPAD_MINPRI").map_err(|_| ()).and_then(|s| s.parse().map_err(|_| ())).unwrap_or(0)
+	};
+
 	if matches.subcommand_name() == None {
 		if let Err(e) = ui::main() {
-			error!("UI encountered fatal error: {}", e);
+			elog!(log; "UI encountered fatal error: {}", e);
 			exit(1);
 		};
 	} else {
 		if matches.subcommand_name() == Some("init") {
 			if let Err(e) = init::main() {
-				error!("{}", e);
+				elog!(log; "Fatal error: {}", e);
 				exit(1);
 			};
 		} else {
@@ -108,24 +140,21 @@ vice versa.")
 				if let Some(parent) = env::current_dir().unwrap().parent() {
 					env::set_current_dir(&parent).unwrap();
 				} else {
-					error!("This is not a laspad project!");
+					elog!(log; "This is not a laspad project!");
 					exit(1);
 				};
 			};
 
-			let stdout = &mut ::std::io::stdout();
-			let stderr = &mut ::std::io::stderr();
-
 			if let Err(e) = match matches.subcommand() {
-				("need",    Some(m)) => need::   main(m.value_of("MODID" ).unwrap(), stdout),
-				("update",  Some(_)) => update:: main(stdout),
-				("compile", Some(_)) => compile::main(stderr),
-				("publish", Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), stdout, stderr),
+				("need",    Some(m)) => need::   main(m.value_of("MODID" ).unwrap(), log),
+				("update",  Some(_)) => update:: main(log),
+				("compile", Some(_)) => compile::main(log),
+				("publish", Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), log),
 				_                    => {
 					unreachable!();
 				},
 			} {
-				error!("{}", e);
+				elog!(log; "Fatal error: {}", e);
 				exit(1);
 			};
 		};

@@ -7,6 +7,8 @@ use zip::read::ZipArchive;
 use failure::*;
 use curl::easy::Easy;
 
+use logger::*;
+
 type Result<T> = ::std::result::Result<T, Error>;
 
 mod ns2_xml_format {
@@ -50,15 +52,15 @@ fn download(url: &str) -> Result<Vec<u8>> {
 	Ok(buf)
 }
 
-pub fn specific(dep: &str, output: &mut Write) -> Result<()> {
-	debug!("Updating {}", dep);
+pub fn specific(dep: &str, log: &Log) -> Result<()> {
+	log!(log, 1; "Updating {}", dep);
 
 	let modid = match u64::from_str_radix(dep, 16) {
 		Ok(modid) => modid,
-		Err(_)    => {debug!("{} is not a workshop item", dep); return Ok(())},
+		Err(_)    => {log!(log, 1; "{} is not a workshop item", dep); return Ok(())},
 	};
 
-	debug!("{} is a workshop item", dep);
+	log!(log, 1; "{} is a workshop item", dep);
 	let dep_path = &Path::new("dependencies").join(dep);
 
 	let format: NS2XMLFormat = serde_xml_rs::deserialize(&*download(&format!(
@@ -74,7 +76,7 @@ pub fn specific(dep: &str, output: &mut Write) -> Result<()> {
 	};
 	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
 	if local_update < remote_update {
-		let _ = writeln!(output, "Local workshop item {} copy is outdated, {} < {}", dep, local_update, remote_update);
+		log!(log; "Local workshop item {} copy is outdated, {} < {}", dep, local_update, remote_update);
 		for entry in fs::read_dir(dep_path)? {
 			let entry = &entry?.path();
 			if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
@@ -99,18 +101,18 @@ pub fn specific(dep: &str, output: &mut Write) -> Result<()> {
 		};
 		File::create(path)?.write_u64::<LE>(remote_update)?;
 	} else {
-		let _ = writeln!(output, "Local workshop item {} copy is up-to-date", dep);
+		log!(log; "Local workshop item {} copy is up-to-date", dep);
 	};
 
 	Ok(())
 }
 
 
-pub fn main(output: &mut Write) -> Result<()> {
+pub fn main(log: &Log) -> Result<()> {
 	let dependencies = Path::new("dependencies");
 	if dependencies.exists() {
 		for dependency in fs::read_dir(dependencies)? {
-			specific(&dependency?.file_name().into_string().expect("Invalid UTF-8"), output)?;
+			specific(&dependency?.file_name().into_string().expect("Invalid UTF-8"), log)?;
 		};
 	};
 	Ok(())
