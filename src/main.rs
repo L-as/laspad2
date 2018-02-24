@@ -96,27 +96,29 @@ vice versa.")
 
 	struct StdLog<'a> {
 		min_priority: i64,
-		stdout: RefCell<&'a mut Write>,
-		stderr: RefCell<&'a mut Write>,
+		stdout: RefCell<&'a mut StandardStream>,
+		stderr: RefCell<&'a mut StandardStream>,
 	}
 
 	impl<'a> logger::Log for StdLog<'a> {
 		fn write(&self, priority: i64, line: &str) {
 			if priority < self.min_priority {return};
 
-			if priority > 0 {
-				let _ = self.stderr.borrow_mut().write_all(line.as_bytes());
+			let (stream, color) = if priority > 0 {
+				(&self.stderr, Some(Color::Red))
 			} else {
-				let _ = self.stdout.borrow_mut().write_all(line.as_bytes());
+				(&self.stdout, None)
 			};
+			let mut stream = stream.borrow_mut();
+
+			let _ = stream.set_color(ColorSpec::new().set_fg(color));
+			let _ = writeln!(stream, "{}", line);
+			let _ = stream.reset();
 		}
 	}
 
 	let mut stdout = StandardStream::stdout(ColorChoice::Auto);
 	let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-	if stderr.supports_color() {
-		let _ = stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
-	};
 
 	let log = &mut StdLog {
 		stdout: RefCell::new(&mut stdout),
