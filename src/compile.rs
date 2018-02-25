@@ -43,7 +43,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Resu
 		if src.exists() {
 			iterate_dir(src, src, f, g, log)?;
 		} else {
-			elog!(log; "Found no source directory in {}", path.display());
+			elog!(log, 1; "Found no source directory in {}", path.display());
 		};
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
@@ -52,7 +52,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Resu
 			};
 		};
 	} else if path.join("mod.settings").exists() {
-		log!(log, 1; "mod.settings exists in {}", path.display());
+		log!(log, 2; "mod.settings exists in {}", path.display());
 		use regex::Regex;
 		lazy_static! {
 			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
@@ -80,7 +80,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Resu
 			elog!(log; "Found no source directory in {}", path.display());
 		};
 	} else { // just guess
-		log!(log, 1; "Guessing source directory in {}", path.display());
+		log!(log, 2; "Guessing source directory in {}", path.display());
 		let mut found = false;
 		for source_dir in [
 			"source",

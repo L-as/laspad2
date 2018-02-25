@@ -152,14 +152,14 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 		steam::Item(u64::from_str_radix(&fs::read_string(&modid_file).context("Could not read the modid file")?, 16)?)
 	} else {
 		let item = create_workshop_item(&mut remote, &mut utils)?;
-		log!(log; "Created Mod ID: {:X}", item.0);
+		log!(log, 1; "Created Mod ID: {:X}", item.0);
 		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
 
 	update::main(log)?;
 
-	log!(log; "Zipping up files");
+	log!(log, 1; "Zipping up files");
 	let zip = Vec::new();
 	let zip = {
 		use std::cell::RefCell;
@@ -187,7 +187,7 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 		zip.get_mut().finish()?.into_inner()
 	};
 
-	log!(log; "Finished preparing preview and description");
+	log!(log, 1; "Finished preparing preview and description");
 	let mut preview = fs::read(&*branch.preview).context("Could not read preview")?;
 	if preview.len() == 0 { // Steam craps itself when it has 0 length
 		preview.push(0);
@@ -203,18 +203,18 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 		description
 	};
 
-	log!(log; "Uploading zip");
+	log!(log, 1; "Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
 		bail!(PublishError::CantUploadMod);
 	};
 
-	log!(log; "Uploading preview");
+	log!(log, 1; "Uploading preview");
 	if remote.file_write("laspad_preview", &preview).is_err() {
 		bail!(PublishError::CantUploadPreview);
 	};
 
 	let mut request_update = || {
-		log!(log; "Requesting workshop item update");
+		log!(log, 1; "Requesting workshop item update");
 		let u = remote.update_workshop_file(item);
 		if u.title(&branch.name).is_err() {
 			elog!(log; "Could not update title");
@@ -243,9 +243,9 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 
 		let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
 
-		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item.0));
+		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item));
 		if let Ok(item) = result {
-			log!(log; "Published mod: {:X}", item);
+			log!(log; "Published mod: {}", item);
 		};
 
 		Ok(result?)

@@ -104,16 +104,19 @@ vice versa.")
 		fn write(&self, priority: i64, line: &str) {
 			if priority < self.min_priority {return};
 
-			let (stream, color) = if priority > 0 {
-				(&self.stderr, Some(Color::Red))
+			if priority > 0 {
+				let mut s = self.stderr.borrow_mut();
+				let _ = s.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
+				let _ = writeln!(s, "{}", line);
+				let _ = s.reset();
+			} else if priority == 0 {
+				let mut s = self.stdout.borrow_mut();
+				let _ = s.set_color(ColorSpec::new().set_bold(true));
+				let _ = writeln!(s, "{}", line);
+				let _ = s.reset();
 			} else {
-				(&self.stdout, None)
+				let _ = writeln!(self.stdout.borrow_mut(), "{}", line);
 			};
-			let mut stream = stream.borrow_mut();
-
-			let _ = stream.set_color(ColorSpec::new().set_fg(color));
-			let _ = writeln!(stream, "{}", line);
-			let _ = stream.reset();
 		}
 	}
 
