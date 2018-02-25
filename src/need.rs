@@ -4,7 +4,6 @@ use std::path::{PathBuf, Path};
 use failure::*;
 
 use logger::*;
-use update;
 
 #[derive(Debug, Fail)]
 pub enum NeedError {
@@ -14,7 +13,7 @@ pub enum NeedError {
 
 type Result = ::std::result::Result<(), Error>;
 
-pub fn main(dep: &str, log: &Log) -> Result {
+pub fn main(dep: &str, _log: &Log) -> Result {
 	fs::create_dir_all("dependencies")?;
 
 	let dep = dep.to_uppercase();
@@ -24,7 +23,6 @@ pub fn main(dep: &str, log: &Log) -> Result {
 
 	fs::create_dir(&path)?;
 	File::create(path.join(".laspad_dummy"))?;
-	update::specific(&dep, log)?;
 
 	if Path::new(".git").exists() {
 		OpenOptions::new()
