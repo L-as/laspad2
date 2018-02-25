@@ -7,6 +7,7 @@ use zip::read::ZipArchive;
 use failure::*;
 use curl::easy::Easy;
 
+use steam::Item;
 use logger::*;
 
 type Result<T> = ::std::result::Result<T, Error>;
@@ -52,32 +53,25 @@ fn download(url: &str) -> Result<Vec<u8>> {
 	Ok(buf)
 }
 
-pub fn specific(dep: &str, log: &Log) -> Result<()> {
-	log!(log, 1; "Updating {}", dep);
-
-	let modid = match u64::from_str_radix(dep, 16) {
-		Ok(modid) => modid,
-		Err(_)    => {log!(log, 1; "{} is not a workshop item", dep); return Ok(())},
-	};
-
-	log!(log, 1; "{} is a workshop item", dep);
-	let dep_path = &Path::new("dependencies").join(dep);
-
+pub fn specific(item: Item, path: &Path, log: &Log) -> Result<()> {
 	let format: NS2XMLFormat = serde_xml_rs::deserialize(&*download(&format!(
 		"http://mods.ns2cdt.com/ISteamRemoteStorage/GetPublishedFileDetails/V0001?format=xml&publishedfileid={}",
-		modid
-	))?).with_context(|_| format!("Could not deserialize XML from Steam for {}", dep))?;
+		item.0
+	))?).with_context(|_| format!("Could not deserialize XML from Steam for {}", item))?;
 
-	let path          = dep_path.join(".update_timestamp");
-	let local_update  = if path.exists() {
-		File::open(&path)?.read_u64::<LE>()?
-	} else {
-		0
+	let local_update = {
+		let path = path.join(".update_timestamp");
+		if path.exists() {
+			File::open(&path)?.read_u64::<LE>()?
+		} else {
+			0
+		}
 	};
+
 	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
 	if local_update < remote_update {
-		log!(log; "Local workshop item {} copy is outdated, {} < {}", dep, local_update, remote_update);
-		for entry in fs::read_dir(dep_path)? {
+		log!(log; "Local workshop item {} copy is outdated, {} < {}", item, local_update, remote_update);
+		for entry in fs::read_dir(path)? {
 			let entry = &entry?.path();
 			if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
 				if entry.is_dir() {
@@ -90,18 +84,18 @@ pub fn specific(dep: &str, log: &Log) -> Result<()> {
 
 		let url = &format.publishedfiledetails.publishedfile.file_url;
 		let buf = download(url)?;
-		let mut archive = ZipArchive::new(Cursor::new(buf)).with_context(|_| format!("Could not read zip archive for {} @ {}", dep, url))?;
+		let mut archive = ZipArchive::new(Cursor::new(buf)).with_context(|_| format!("Could not read zip archive for {} @ {}", item, url))?;
 		for i in 0..archive.len() {
-			let mut file = archive.by_index(i).with_context(|_| format!("Could not access file in zip archive for {}", dep))?;
-			let path = dep_path.join(file.name());
+			let mut file = archive.by_index(i).with_context(|_| format!("Could not access file in zip archive for {}", item))?;
+			let path = path.join(file.name());
 			fs::create_dir_all(path.parent().unwrap())?;
 			let mut buf = Vec::new();
 			file.read_to_end(&mut buf)?;
 			File::create(path)?.write_all(&buf)?;
 		};
-		File::create(path)?.write_u64::<LE>(remote_update)?;
+		File::create(path.join(".update_timestamp"))?.write_u64::<LE>(remote_update)?;
 	} else {
-		log!(log; "Local workshop item {} copy is up-to-date", dep);
+		log!(log; "Local workshop item {} copy is up-to-date", item);
 	};
 
 	Ok(())
@@ -111,8 +105,13 @@ pub fn specific(dep: &str, log: &Log) -> Result<()> {
 pub fn main(log: &Log) -> Result<()> {
 	let dependencies = Path::new("dependencies");
 	if dependencies.exists() {
-		for dependency in fs::read_dir(dependencies)? {
-			specific(&dependency?.file_name().into_string().expect("Invalid UTF-8"), log)?;
+		for dep in fs::read_dir(dependencies)? {
+			let path = &dep?.path();
+			if let Ok(modid) = u64::from_str_radix(path.file_name().unwrap().to_str().unwrap(), 16) {
+				if let Err(e) = specific(Item(modid), path, log) {
+					elog!(log; "Could not update {}: {}", Item(modid), e);
+				};
+			};
 		};
 	};
 	Ok(())

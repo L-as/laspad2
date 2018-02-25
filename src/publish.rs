@@ -46,10 +46,10 @@ struct Branch {
 	preview:         Box<str>,
 }
 
-pub fn generate_description(modid: u64) -> Result<String> {
+pub fn generate_description(item: steam::Item) -> Result<String> {
 	let mut s: String = format!(
-		"[b]Mod ID: {:X}[/b]\n\n",
-		modid
+		"[b]Mod ID: {}[/b]\n\n",
+		item
 	);
 
 	if Path::new(".git").exists() {
@@ -196,7 +196,7 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 	let description = md_to_bb::convert(&fs::read_string(&*branch.description).context("Could not read description")?);
 
 	let description = if branch.autodescription {
-		let mut s = generate_description(item.0)?;
+		let mut s = generate_description(item)?;
 		s.push_str(&description);
 		s
 	} else {
