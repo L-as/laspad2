@@ -144,7 +144,7 @@ vice versa.")
 fn execute_command<'a>(matches: &clap::ArgMatches<'a>, log: &logger::Log) -> Result<(), failure::Error> {
 	match matches.subcommand() {
 		("",         None)    =>      ui::main(),
-		("init",     Some(_)) =>    init::main(),
+		("init",     Some(_)) =>    init::main(log),
 		("need",     Some(m)) =>    need::main(m.value_of("MODID" ).unwrap(), log),
 		("update",   Some(_)) =>  update::main(log),
 		("compile",  Some(_)) => compile::main(log),
