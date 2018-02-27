@@ -55,6 +55,7 @@ fn main() {
 		(version: crate_version!())
 		(author:  "las <las@protonmail.ch>")
 		(about:   "Replacement of Launch Pad for Natural Selection 2, i.e. can publish mods to workshop.")
+		(@arg VERBOSITY: -v +multiple "Sets verbosity, use multiple times to increase verbosity.")
 		//(@setting SubcommandRequiredElseHelp)
 		(@setting VersionlessSubcommands)
 		(@subcommand init =>
@@ -131,7 +132,7 @@ vice versa.")
 	let log = &mut StdLog {
 		stdout: RefCell::new(&mut stdout),
 		stderr: RefCell::new(&mut stderr),
-		min_priority: env::var("LASPAD_MINPRI").map_err(|_| ()).and_then(|s| s.parse().map_err(|_| ())).unwrap_or(0)
+		min_priority: -(matches.occurrences_of("VERBOSITY") as i64),
 	};
 
 	if let Err(e) = execute_command(&matches, log) {
