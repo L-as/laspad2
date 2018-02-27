@@ -3,6 +3,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use failure::*;
 
+use common;
 use logger::*;
 
 type Result = ::std::result::Result<(), Error>;
@@ -102,6 +103,8 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Resu
 }
 
 pub fn main(log: &Log) -> Result {
+	common::find_project()?;
+
 	let dest = Path::new("compiled");
 
 	if dest.exists() {

@@ -4,6 +4,7 @@ use std::path::{PathBuf, Path};
 use failure::*;
 
 use logger::*;
+use common;
 
 #[derive(Debug, Fail)]
 pub enum NeedError {
@@ -14,6 +15,8 @@ pub enum NeedError {
 type Result = ::std::result::Result<(), Error>;
 
 pub fn main(dep: &str, _log: &Log) -> Result {
+	common::find_project()?;
+
 	fs::create_dir_all("dependencies")?;
 
 	let dep = dep.to_uppercase();

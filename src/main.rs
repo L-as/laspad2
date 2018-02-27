@@ -28,6 +28,7 @@ extern crate termcolor;
 mod steam;
 mod md_to_bb;
 mod ui;
+mod common;
 #[macro_use]
 mod logger;
 
@@ -39,7 +40,6 @@ mod compile;
 mod publish;
 
 use std::process::exit;
-use std::path::Path;
 use std::io::Write;
 use std::cell::RefCell;
 use std::env;
@@ -66,6 +66,11 @@ fn main() {
 		)
 		(@subcommand update =>
 			(about: "Updates dependencies\nNB: `publish` automatically runs `update`")
+		)
+		(@subcommand download =>
+			(about: "Download and extract mod from workshop into target folder")
+			(@arg MODID: +required "Hexadecimal ID of workshop item")
+			(@arg PATH:  +required "Where to extract it")
 		)
 		(@subcommand compile =>
 			(about: "\
@@ -129,39 +134,30 @@ vice versa.")
 		min_priority: env::var("LASPAD_MINPRI").map_err(|_| ()).and_then(|s| s.parse().map_err(|_| ())).unwrap_or(0)
 	};
 
-	if matches.subcommand_name() == None {
-		if let Err(e) = ui::main() {
-			elog!(log; "UI encountered fatal error: {}", e);
-			exit(1);
-		};
-	} else {
-		if matches.subcommand_name() == Some("init") {
-			if let Err(e) = init::main() {
-				elog!(log; "Fatal error: {}", e);
-				exit(1);
-			};
-		} else {
-			while !Path::new("laspad.toml").exists() {
-				if let Some(parent) = env::current_dir().unwrap().parent() {
-					env::set_current_dir(&parent).unwrap();
-				} else {
-					elog!(log; "This is not a laspad project!");
-					exit(1);
-				};
-			};
-
-			if let Err(e) = match matches.subcommand() {
-				("need",    Some(m)) => need::   main(m.value_of("MODID" ).unwrap(), log),
-				("update",  Some(_)) => update:: main(log),
-				("compile", Some(_)) => compile::main(log),
-				("publish", Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), log),
-				_                    => {
-					unreachable!();
-				},
-			} {
-				elog!(log; "Fatal error: {}", e);
-				exit(1);
-			};
-		};
+	if let Err(e) = execute_command(&matches, log) {
+		elog!(log; "Fatal error: {}", e);
+		exit(1);
 	};
+}
+
+fn execute_command<'a>(matches: &clap::ArgMatches<'a>, log: &logger::Log) -> Result<(), failure::Error> {
+	match matches.subcommand() {
+		("",         None)    =>      ui::main(),
+		("init",     Some(_)) =>    init::main(),
+		("need",     Some(m)) =>    need::main(m.value_of("MODID" ).unwrap(), log),
+		("update",   Some(_)) =>  update::main(log),
+		("compile",  Some(_)) => compile::main(log),
+		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), log),
+		("download", Some(m)) => {
+			use std::fs;
+
+			let path = m.value_of("PATH").unwrap();
+			fs::create_dir_all(path)?;
+			let modid = u64::from_str_radix(&m.value_of("MODID").unwrap().to_uppercase(), 16)?;
+			update::specific(steam::Item(modid), m.value_of("PATH").unwrap(), log)
+		},
+		_ => {
+			unreachable!();
+		},
+	}
 }

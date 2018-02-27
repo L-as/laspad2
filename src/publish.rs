@@ -11,6 +11,7 @@ use steam::{Error as SteamError, self};
 use update;
 use compile;
 use md_to_bb;
+use common;
 use logger::*;
 
 #[derive(Debug, Fail)]
@@ -123,6 +124,8 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 }
 
 pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
+	common::find_project()?;
+
 	let mut buf = String::new();
 	File::open("laspad.toml")?.read_to_string(&mut buf)?;
 

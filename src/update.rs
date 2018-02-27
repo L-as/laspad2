@@ -9,6 +9,7 @@ use curl::easy::Easy;
 
 use steam::Item;
 use logger::*;
+use common;
 
 type Result<T> = ::std::result::Result<T, Error>;
 
@@ -53,7 +54,9 @@ fn download(url: &str) -> Result<Vec<u8>> {
 	Ok(buf)
 }
 
-pub fn specific(item: Item, path: &Path, log: &Log) -> Result<()> {
+pub fn specific<P: AsRef<Path>>(item: Item, path: P, log: &Log) -> Result<()> {
+	let path = path.as_ref();
+
 	let format: NS2XMLFormat = serde_xml_rs::deserialize(&*download(&format!(
 		"http://mods.ns2cdt.com/ISteamRemoteStorage/GetPublishedFileDetails/V0001?format=xml&publishedfileid={}",
 		item.0
@@ -103,6 +106,8 @@ pub fn specific(item: Item, path: &Path, log: &Log) -> Result<()> {
 
 
 pub fn main(log: &Log) -> Result<()> {
+	common::find_project()?;
+
 	let dependencies = Path::new("dependencies");
 	if dependencies.exists() {
 		for dep in fs::read_dir(dependencies)? {
