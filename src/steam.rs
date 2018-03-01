@@ -5,6 +5,8 @@ use std::mem::{forget, size_of, transmute, zeroed};
 use std::error;
 use std::fmt;
 
+use failure::*;
+
 include!("steam_ffi.rs");
 
 #[repr(C)]
@@ -126,15 +128,6 @@ impl<'a> ItemUpdater<'a> {
 pub struct RemoteStorage(*mut RemoteStorageImpl);
 
 impl RemoteStorage {
-	pub fn new() -> Result<Self, ()> {
-		let ptr = unsafe {SteamRemoteStorage()};
-		if ptr.is_null() {
-			Err(())
-		} else {
-			Ok(RemoteStorage(ptr))
-		}
-	}
-
 	pub fn file_write(&mut self, name: &str, data: &[u8]) -> Result<(), ()> {
 		if unsafe {SteamAPI_ISteamRemoteStorage_FileWrite(
 			self.0,
@@ -178,15 +171,6 @@ impl RemoteStorage {
 pub struct Utils(*mut UtilsImpl);
 
 impl Utils {
-	pub fn new() -> Result<Self, ()> {
-		let ptr = unsafe {SteamUtils()};
-		if ptr.is_null() {
-			Err(())
-		} else {
-			Ok(Utils(ptr))
-		}
-	}
-
 	pub fn is_apicall_completed(&self, call: APICall) -> bool {
 		let mut b = false;
 		unsafe { SteamAPI_ISteamUtils_IsAPICallCompleted(self.0, call, &mut b as *mut bool) }
@@ -214,14 +198,39 @@ impl Utils {
 	}
 }
 
-pub fn init() -> Result<(), ()> {
-	if unsafe { SteamAPI_Init() } {
-		Ok(())
-	} else {
-		Err(())
+pub struct Client(*mut ClientImpl);
+
+impl Client {
+	pub fn new() -> Result<Self, Error> {
+		ensure!(unsafe {SteamAPI_Init()}, "Could not initialize SteamAPI");
+
+		let client: *mut ClientImpl = unsafe { transmute(SteamInternal_CreateInterface(CString::new("SteamClient017").unwrap().as_ptr())) };
+
+		Ok(Client(client))
+	}
+
+	pub fn remote_storage(&self) -> Result<RemoteStorage, Error> {
+		let user    = unsafe {SteamAPI_GetHSteamUser()};
+		let pipe    = unsafe {SteamAPI_GetHSteamPipe()};
+		let storage = unsafe {SteamAPI_ISteamClient_GetISteamRemoteStorage(self.0, user, pipe, CString::new("STEAMREMOTESTORAGE_INTERFACE_VERSION014").unwrap().as_ptr())};
+
+		ensure!(!storage.is_null(), "Could not retrive steam's remote storage API");
+
+		Ok(RemoteStorage(storage))
+	}
+
+	pub fn utils(&self) -> Result<Utils, Error> {
+		let pipe    = unsafe {SteamAPI_GetHSteamPipe()};
+		let utils = unsafe {SteamAPI_ISteamClient_GetISteamUtils(self.0, pipe, CString::new("SteamUtils009").unwrap().as_ptr())};
+
+		ensure!(!utils.is_null(), "Could not retrive steam's utils API");
+
+		Ok(Utils(utils))
 	}
 }
 
-pub fn deinit() {
-	unsafe { SteamAPI_Shutdown() }
+impl Drop for Client {
+	fn drop(&mut self) {
+		unsafe {SteamAPI_Shutdown()}
+	}
 }

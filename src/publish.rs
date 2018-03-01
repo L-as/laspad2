@@ -7,7 +7,7 @@ use zip;
 use git2::Repository;
 use toml;
 
-use steam::{Error as SteamError, self};
+use steam::{GeneralError as SteamError, self};
 use update;
 use compile;
 use md_to_bb;
@@ -22,12 +22,6 @@ pub enum PublishError {
 	NonexistentBranch {
 		branch: String
 	},
-	#[fail(display = "Could not initialize Steam API")]
-	NoSteam,
-	#[fail(display = "Could not create SteamRemoteStorage API interface")]
-	NoSteamRemoteStorage,
-	#[fail(display = "Could not create SteamUtils API interface")]
-	NoSteamUtils,
 	#[fail(display = "Could not upload zip file to remote storage")]
 	CantUploadMod,
 	#[fail(display = "Could not upload preview to remote storage")]
@@ -140,15 +134,9 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 		unreachable!()
 	};
 
-	ensure!(steam::init().is_ok(), PublishError::NoSteam);
-	let mut remote = match steam::RemoteStorage::new() {
-		Ok(r) => r,
-		Err(_) => bail!(PublishError::NoSteamRemoteStorage),
-	};
-	let mut utils  = match steam::Utils::new() {
-		Ok(r) => r,
-		Err(_) => bail!(PublishError::NoSteamUtils),
-	};
+	let client     = steam::Client::new()?;
+	let mut remote = client.remote_storage()?;
+	let mut utils  = client.utils()?;
 
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
@@ -269,8 +257,6 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 	} else {
 		request_update()?;
 	};
-
-	steam::deinit();
 
 	Ok(())
 }

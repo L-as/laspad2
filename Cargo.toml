@@ -22,3 +22,6 @@ web-view          = "*"
 nfd               = "*"
 failure           = "*"
 termcolor         = "*"
+
+[build-dependencies]
+curl              = "*"

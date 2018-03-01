@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SteamResult(u32);
 
-impl From<SteamResult> for Result<(), Error> {
+impl From<SteamResult> for Result<(), GeneralError> {
 	fn from(sr: SteamResult) -> Self {
 		use std::mem::transmute;
 
@@ -14,7 +14,7 @@ impl From<SteamResult> for Result<(), Error> {
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Error {
+pub enum GeneralError {
 	Fail                                    = 2,
 	NoConnection                            = 3,
 	InvalidPassword                         = 5,
@@ -125,13 +125,13 @@ pub enum Error {
 	WGNetworkSendExceeded                   = 110,
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for GeneralError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		fmt::Debug::fmt(&self, f)
 	}
 }
 
-impl error::Error for Error {
+impl error::Error for GeneralError {
 	fn description(&self) -> &str {
 		"<N/A>"
 	}
@@ -162,6 +162,14 @@ struct Strings {
 	length:   i32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct User(i32);
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Pipe(i32);
+
 #[link(name = "steam_api")]
 #[no_mangle]
 extern "C" {
@@ -171,9 +179,6 @@ extern "C" {
 
 	fn SteamAPI_Init() -> bool;
 	fn SteamAPI_Shutdown();
-
-	fn SteamRemoteStorage() -> *mut RemoteStorageImpl;
-	fn SteamUtils()         -> *mut UtilsImpl;
 
 	fn SteamAPI_ISteamRemoteStorage_PublishWorkshopFile(a: *mut RemoteStorageImpl, b: *const i8, c: *const i8, d: u32, e: *const i8, f: *const i8, g: Visibility, h: *const Strings, i: FileType) -> APICall;
 
@@ -193,4 +198,12 @@ extern "C" {
 	fn SteamAPI_ISteamUtils_IsAPICallCompleted(a:      *mut UtilsImpl, b: APICall, c: *mut bool) -> bool;
 	fn SteamAPI_ISteamUtils_GetAPICallResult(a:        *mut UtilsImpl, b: APICall, c: *mut u8,   d: u32, e: u32, f: *mut bool) -> bool;
 	fn SteamAPI_ISteamUtils_GetAPICallFailureReason(a: *mut UtilsImpl, b: APICall) -> APICallFailureReason;
+
+	fn SteamAPI_ISteamClient_GetISteamRemoteStorage(a: *const ClientImpl, b: User, c: Pipe, d: *const i8) -> *mut RemoteStorageImpl;
+	fn SteamAPI_ISteamClient_GetISteamUtils(a:         *const ClientImpl, b: Pipe, c: *const i8)          -> *mut UtilsImpl;
+
+	fn SteamAPI_GetHSteamUser() -> User;
+	fn SteamAPI_GetHSteamPipe() -> Pipe;
+
+	fn SteamInternal_CreateInterface(a: *const i8) -> *mut u8;
 }
