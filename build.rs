@@ -9,16 +9,16 @@ use curl::easy::Easy;
 fn main() {
 	// Linking to steam's API
 	{
-		for &(src, dst) in [
-			("libsteam_api.so", "libsteam_api.so"),
-			("steam_api64.dll",   "steam_api.dll"),
+		for &lib in [
+			"libsteam_api.so",
+			"steam_api64.dll",
 		].iter() {
-			let dst = Path::new("3rdparty").join(dst);
+			let dst = Path::new("3rdparty").join(lib);
 
 			let mut dst = File::create(dst).unwrap();
 
 			let mut easy = Easy::new();
-			easy.url(&format!("https://raw.githubusercontent.com/rlabrecque/Steamworks.NET/master/Plugins/x86_64/{}", src)).unwrap();
+			easy.url(&format!("https://raw.githubusercontent.com/rlabrecque/Steamworks.NET/master/Plugins/x86_64/{}", lib)).unwrap();
 			easy.write_function(move |data| {
 				Ok(dst.write(data).unwrap())
 			}).unwrap();
