@@ -170,7 +170,8 @@ struct User(i32);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Pipe(i32);
 
-#[link(name = "steam_api")]
+#[cfg_attr(unix,    link(name = "steam_api"))]
+#[cfg_attr(windows, link(name = "steam_api64"))]
 #[no_mangle]
 extern "C" {
 	type RemoteStorageImpl;
