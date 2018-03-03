@@ -132,7 +132,7 @@ vice versa.")
 	let log = &mut StdLog {
 		stdout: RefCell::new(&mut stdout),
 		stderr: RefCell::new(&mut stderr),
-		min_priority: -(matches.occurrences_of("VERBOSITY") as i64),
+		min_priority: -(matches.occurrences_of("VERBOSITY") as i64 + 1),
 	};
 
 	if let Err(e) = execute_command(&matches, log) {
