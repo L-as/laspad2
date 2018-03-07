@@ -14,6 +14,7 @@ fn main() {
 			"steam_api64.dll",
 		].iter() {
 			let dst = Path::new("3rdparty").join(lib);
+			if dst.exists() {continue};
 
 			let mut dst = File::create(dst).unwrap();
 
