@@ -1,5 +1,6 @@
 #![feature(extern_types)]
 #![feature(fs_read_write)]
+#![feature(slice_concat_ext)]
 #![allow(safe_packed_borrows)]
 #![deny(unused_must_use)]
 
@@ -11,6 +12,8 @@ extern crate serde_derive;
 extern crate lazy_static;
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate downcast;
 
 extern crate toml;
 extern crate serde;
@@ -21,16 +24,18 @@ extern crate curl;
 extern crate regex;
 extern crate git2;
 extern crate web_view as webview;
-extern crate urlencoding;
 extern crate nfd;
 extern crate termcolor;
+extern crate futures;
+extern crate hyper;
+
+#[macro_use]
+mod logger;
 
 mod steam;
 mod md_to_bb;
 mod ui;
 mod common;
-#[macro_use]
-mod logger;
 
 // console commands
 mod init;
@@ -41,10 +46,32 @@ mod publish;
 
 use std::process::exit;
 use std::io::Write;
-use std::cell::RefCell;
 use std::env;
 
 use termcolor::{StandardStream, ColorChoice, ColorSpec, Color, WriteColor};
+
+use logger::Log;
+
+struct StdLog {
+	stdout: StandardStream,
+	stderr: StandardStream,
+}
+
+impl Log for StdLog {
+	fn write(&mut self, priority: i64, line: &str) {
+		if priority > 0 {
+			let _ = self.stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
+			let _ = writeln!(self.stderr, "{}", line);
+			let _ = self.stderr.reset();
+		} else if priority == 0 {
+			let _ = self.stdout.set_color(ColorSpec::new().set_bold(true));
+			let _ = writeln!(self.stdout, "{}", line);
+			let _ = self.stdout.reset();
+		} else {
+			let _ = writeln!(self.stdout, "{}", line);
+		};
+	}
+}
 
 fn main() {
 	if env::var_os("RUST_LOG").is_none() {
@@ -100,62 +127,36 @@ vice versa.")
 		//)
 	).get_matches();
 
-	struct StdLog<'a> {
-		min_priority: i64,
-		stdout: RefCell<&'a mut StandardStream>,
-		stderr: RefCell<&'a mut StandardStream>,
-	}
+	logger::set_priority(-(matches.occurrences_of("VERBOSITY") as i64 + 1));
 
-	impl<'a> logger::Log for StdLog<'a> {
-		fn write(&self, priority: i64, line: &str) {
-			if priority < self.min_priority {return};
-
-			if priority > 0 {
-				let mut s = self.stderr.borrow_mut();
-				let _ = s.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
-				let _ = writeln!(s, "{}", line);
-				let _ = s.reset();
-			} else if priority == 0 {
-				let mut s = self.stdout.borrow_mut();
-				let _ = s.set_color(ColorSpec::new().set_bold(true));
-				let _ = writeln!(s, "{}", line);
-				let _ = s.reset();
-			} else {
-				let _ = writeln!(self.stdout.borrow_mut(), "{}", line);
-			};
-		}
-	}
-
-	let mut stdout = StandardStream::stdout(ColorChoice::Auto);
-	let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-
-	let log = &mut StdLog {
-		stdout: RefCell::new(&mut stdout),
-		stderr: RefCell::new(&mut stderr),
-		min_priority: -(matches.occurrences_of("VERBOSITY") as i64 + 1),
+	let log = StdLog {
+		stdout: StandardStream::stdout(ColorChoice::Auto),
+		stderr: StandardStream::stderr(ColorChoice::Auto),
 	};
 
-	if let Err(e) = execute_command(&matches, log) {
+	logger::set(Box::new(log));
+
+	if let Err(e) = execute_command(&matches) {
 		elog!(log; "Fatal error: {}", e);
 		exit(1);
 	};
 }
 
-fn execute_command<'a>(matches: &clap::ArgMatches<'a>, log: &logger::Log) -> Result<(), failure::Error> {
+fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Error> {
 	match matches.subcommand() {
 		("",         None)    =>      ui::main(),
-		("init",     Some(_)) =>    init::main(log),
-		("need",     Some(m)) =>    need::main(m.value_of("MODID" ).unwrap(), log),
-		("update",   Some(_)) =>  update::main(log),
-		("compile",  Some(_)) => compile::main(log),
-		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY"), log),
+		("init",     Some(_)) =>    init::main(),
+		("need",     Some(m)) =>    need::main(m.value_of("MODID" ).unwrap()),
+		("update",   Some(_)) =>  update::main(),
+		("compile",  Some(_)) => compile::main(),
+		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY")),
 		("download", Some(m)) => {
 			use std::fs;
 
 			let path = m.value_of("PATH").unwrap();
 			fs::create_dir_all(path)?;
 			let modid = u64::from_str_radix(&m.value_of("MODID").unwrap().to_uppercase(), 16)?;
-			update::specific(steam::Item(modid), m.value_of("PATH").unwrap(), log)
+			update::specific(steam::Item(modid), m.value_of("PATH").unwrap())
 		},
 		_ => {
 			unreachable!();

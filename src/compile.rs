@@ -4,11 +4,10 @@ use std::path::Path;
 use failure::*;
 
 use common;
-use logger::*;
 
 type Result = ::std::result::Result<(), Error>;
 
-fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G, log: &Log) -> Result
+fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
 	where
 	F: FnMut(&Path, &Path) -> Result,
 	G: FnMut(&Path)        -> Result
@@ -19,7 +18,7 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G, log: &Log) 
 			let rel = entry.strip_prefix(root)?;
 			if entry.is_dir() {
 				g(rel)?;
-				iterate_dir(root, entry, f, g, log)?;
+				iterate_dir(root, entry, f, g)?;
 			} else {
 				f(entry, rel)?;
 			};
@@ -30,26 +29,26 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G, log: &Log) 
 	Ok(())
 }
 
-pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Result
+pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 	where
 	F: FnMut(&Path, &Path) -> Result,
 	G: FnMut(&Path)        -> Result
 {
 	if path.join(".update_timestamp").exists() {
 		log!(log, 2; ".update_timestamp exists in {}", path.display());
-		iterate_dir(path, path, f, g, log)?;
+		iterate_dir(path, path, f, g)?;
 	} else if path.join("laspad.toml").exists() {
 		log!(log, 2; "laspad.toml exists in {}", path.display());
 		let src = &path.join("src");
 		if src.exists() {
-			iterate_dir(src, src, f, g, log)?;
+			iterate_dir(src, src, f, g)?;
 		} else {
 			elog!(log, 1; "Found no source directory in {}", path.display());
 		};
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
-				iterate_files(&dependency?.path(), f, g, log)?;
+				iterate_files(&dependency?.path(), f, g)?;
 			};
 		};
 	} else if path.join("mod.settings").exists() {
@@ -66,7 +65,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Resu
 			let s = path.join(&captures[1]);
 			if s.exists() {
 				found = true;
-				iterate_dir(&s, &s, f, g, log)?;
+				iterate_dir(&s, &s, f, g)?;
 			};
 			source = Some(s.clone());
 		};
@@ -74,7 +73,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Resu
 			let s = path.join(&captures[1]);
 			if s.exists() && source.is_none() || &s != &source.unwrap() {
 				found = true;
-				iterate_dir(&s, &s, f, g, log)?;
+				iterate_dir(&s, &s, f, g)?;
 			};
 		};
 		if !found {
@@ -92,17 +91,17 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G, log: &Log) -> Resu
 			if source_dir.exists() {
 				found = true;
 				log!(log, 2; "Found {} in {}", source_dir.display(), path.display());
-				iterate_dir(source_dir, source_dir, f, g, log)?;
+				iterate_dir(source_dir, source_dir, f, g)?;
 			};
 		};
 		if !found {
-			iterate_dir(path, path, f, g, log)?;
+			iterate_dir(path, path, f, g)?;
 		};
 	};
 	Ok(())
 }
 
-pub fn main(log: &Log) -> Result {
+pub fn main() -> Result {
 	common::find_project()?;
 
 	let dest = Path::new("compiled");
@@ -131,5 +130,5 @@ pub fn main(log: &Log) -> Result {
 			format!("Could not create directory {}", rel_path.display())
 		})?;
 		Ok(())
-	}, log)
+	})
 }

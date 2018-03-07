@@ -1,3 +1,74 @@
+html, body {
+	margin:      0;
+	height:      100%;
+	font-family: monospace;
+	color:       white;
+}
+
 body {
 	background-color: #2F2F2F;
+	display:          flex;
+}
+
+.command {
+	border:     none;
+	text-align: center;
+	font-size:  3rem;
+	margin:     0.8vmin;
+	height:     100%;
+}
+
+.branch {
+	margin:     0.8vmin;
+	height:     100%;
+	width:      100%;
+	text-align: center;
+	border:     none;
+	font-size:  2rem;
+	background: #70433A;
+}
+
+#commandpanel {
+	display:        flex;
+	flex-direction: column;
+	align-items:    stretch;
+	flex:           1;
+}
+
+#publish {
+	display:        flex;
+	margin:         none;
+	border:         none;
+	height:         100%;
+	margin-bottom:  1.6vmin;
+	flex-direction: row;
+}
+
+#update {
+	background: #30933A;
+}
+
+#need {
+	background: #CC0;
+}
+
+#log {
+	font-size: 1.3rem;
+	overflow:  auto;
+	margin:    0.8vmin;
+	padding:   1em;
+	flex:      1;
+}
+
+.warning {
+	color: red;
+}
+
+.message {
+	color: white;
+}
+
+.information {
+	color:       white;
+	font-weight: bold;
 }

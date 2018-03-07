@@ -3,8 +3,6 @@ use std::io::{Write};
 use std::path::Path;
 use failure::*;
 
-use logger::*;
-
 #[derive(Debug, Fail)]
 enum InitError {
 	#[fail(display = "This is already a laspad project!")]
@@ -13,7 +11,7 @@ enum InitError {
 
 type Result = ::std::result::Result<(), Error>;
 
-pub fn main(log: &Log) -> Result {
+pub fn main() -> Result {
 	ensure!(!Path::new("laspad.toml").exists(), InitError::AlreadyExists);
 
 	File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;

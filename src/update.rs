@@ -8,7 +8,6 @@ use failure::*;
 use curl::easy::Easy;
 
 use steam::Item;
-use logger::*;
 use common;
 
 type Result<T> = ::std::result::Result<T, Error>;
@@ -54,7 +53,7 @@ fn download(url: &str) -> Result<Vec<u8>> {
 	Ok(buf)
 }
 
-pub fn specific<P: AsRef<Path>>(item: Item, path: P, log: &Log) -> Result<()> {
+pub fn specific<P: AsRef<Path>>(item: Item, path: P) -> Result<()> {
 	let path = path.as_ref();
 
 	let format: NS2XMLFormat = serde_xml_rs::deserialize(&*download(&format!(
@@ -105,7 +104,7 @@ pub fn specific<P: AsRef<Path>>(item: Item, path: P, log: &Log) -> Result<()> {
 }
 
 
-pub fn main(log: &Log) -> Result<()> {
+pub fn main() -> Result<()> {
 	common::find_project()?;
 
 	let dependencies = Path::new("dependencies");
@@ -113,11 +112,13 @@ pub fn main(log: &Log) -> Result<()> {
 		for dep in fs::read_dir(dependencies)? {
 			let path = &dep?.path();
 			if let Ok(modid) = u64::from_str_radix(path.file_name().unwrap().to_str().unwrap(), 16) {
-				if let Err(e) = specific(Item(modid), path, log) {
+				if let Err(e) = specific(Item(modid), path) {
 					elog!(log; "Could not update {}: {}", Item(modid), e);
 				};
 			};
 		};
 	};
+
+	log!(log; "Finished updating");
 	Ok(())
 }

@@ -1,12 +1,18 @@
+
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta charset="UTF-8">
-		<title>laspad</title>
-	</head>
-	<body>
-		<h1>header</h1>
-		<button type=button>HEJ</button>
-		<iframe id=alert style="display:none;"></iframe>
-	</body>
+<head>
+	<meta charset="utf-8" />
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=1" name="viewport" />
+	<link rel="stylesheet" href="index.css" />
+</head>
+<body>
+	<div id="commandpanel">
+		<div                                                      id="publish"></div>
+		<button type="button" onclick="update()"  class="command" id="update"> Update            </button>
+		<button type="button" onclick="need()"    class="command" id="need">   Add new dependency</button>
+	</div>
+	<pre id=log>LASPAD LOG:</pre>
+	<script src="laspad-ui.js"></script>
+</body>
 </html>

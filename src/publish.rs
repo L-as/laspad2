@@ -12,7 +12,6 @@ use update;
 use compile;
 use md_to_bb;
 use common;
-use logger::*;
 
 #[derive(Debug, Fail)]
 pub enum PublishError {
@@ -117,7 +116,7 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 	Ok(StdResult::<_, _>::from(result.result).and(Ok(result.item))?)
 }
 
-pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
+pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	common::find_project()?;
 
 	let mut buf = String::new();
@@ -148,7 +147,7 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 		item
 	};
 
-	update::main(log)?;
+	update::main()?;
 
 	log!(log, 1; "Zipping up files");
 	let zip = Vec::new();
@@ -173,7 +172,7 @@ pub fn main(branch_name: &str, retry: bool, log: &Log) -> Result<()> {
 			log!(log, 2; "--- {} ---", rel_path.display());
 			//zip.borrow_mut().add_directory(rel_path.to_str()?, options)?;
 			Ok(())
-		}, log)?;
+		})?;
 
 		zip.get_mut().finish()?.into_inner()
 	};
