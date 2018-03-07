@@ -76,21 +76,6 @@ function need() {
 	command("/need?" + prompt("Mod ID of dependency to add"))
 }
 
-function find_project(resp) {
-	switch (resp) {
-	case "new":
-		if (confirm("Create a new laspad project here?")) {
-			command("/create_project", () => command("/get_branches", get_branches))
-		} else {
-			command("/find_project", find_project)
-		}
-		break
-	case "old":
-		command("/get_branches", get_branches)
-		break
-	}
-}
-
 function get_branches(resp) {
 	let branches = resp.split("")
 	for(let i = 0; i < branches.length; i++) {
@@ -105,4 +90,7 @@ function get_branches(resp) {
 	}
 }
 
-command("/find_project", find_project)
+// called from webview
+function init() {
+	command("/get_branches", get_branches)
+}

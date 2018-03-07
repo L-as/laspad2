@@ -1,15 +1,13 @@
-//use webview::{self, WebView};
-use nfd;
+use web_view;
 use toml;
 use std::{
 	thread,
 	time,
 	env,
 	fs,
-	process::exit,
-	//time::Duration,
 	path::{PathBuf, Path},
 	fmt::Display,
+	process::exit,
 };
 use failure::*;
 use hyper::{self, server};
@@ -18,23 +16,6 @@ use futures::future::{self, Future};
 use logger::{self, Log};
 
 type Result<T> = ::std::result::Result<T, Error>;
-
-fn find_project() -> Result<&'static str> {
-	fn get_file() -> Result<PathBuf> {
-		match nfd::open_pick_folder(None)? {
-			nfd::Response::Okay(dir) => Ok(PathBuf::from(dir)),
-			nfd::Response::Cancel    => exit(1),
-			_                        => {get_file()}
-		}
-	};
-	let dir = get_file()?;
-	env::set_current_dir(dir)?;
-	if Path::new("laspad.toml").exists() {
-		Ok("old")
-	} else {
-		Ok("new")
-	}
-}
 
 fn get_branches() -> Result<String> {
 	use std::slice::SliceConcatExt;
@@ -127,13 +108,13 @@ impl server::Service for UI {
 			(&Method::Get,  "/",               None)         => HTML,
 			(&Method::Get,  "/index.css",      None)         => CSS,
 			(&Method::Get,  "/laspad-ui.js",   None)         => JS,
+			(&Method::Post, "/exit",           None)         => exit(0),
 			(&Method::Post, "/create_project", None)         => self.dispatch(::init::main),
 			(&Method::Post, "/update",         None)         => self.dispatch(::update::main),
 			(&Method::Post, "/publish",        Some(branch)) => {let branch = branch.to_owned(); self.dispatch(move || ::publish::main(&branch, false))},
 			(&Method::Post, "/need",           Some(modid))  => {let modid  = modid .to_owned(); self.dispatch(move || ::need::main(&modid))},
 			(&Method::Post, command, query) => { // returns String instead of &'static str
 				let body = match command {
-					"/find_project" => self.run(find_project),
 					"/get_branches" => self.run(get_branches),
 					"/get_msg"      => UILog::remove(),
 					_               => {eprintln!("Invalid POST: {}, {:?}", command, query); String::from("ERRSomething went wrong, please retry")},
@@ -154,17 +135,47 @@ impl server::Service for UI {
 }
 
 pub fn main() -> Result<()> {
-	let addr = "127.0.0.1:51823".parse()?;
-	let server = server::Http::new().bind(&addr, move || Ok(UI))?;
-	let log = UILog {
-		sublog: logger::remove(),
-		queue:  Vec::new(),
-	};
-	logger::set(Box::new(log));
-	server.run()?;
+	fn spawn_server() -> Result<()> {
+		let addr = "127.0.0.1:51823".parse()?;
+		let server = server::Http::new().bind(&addr, move || Ok(UI))?;
+		let log = UILog {
+			sublog: logger::remove(),
+			queue:  Vec::new(),
+		};
+		logger::set(Box::new(log));
+		server.run()?;
+		Ok(())
+	}
+	thread::spawn(move || if let Err(e) = spawn_server() {eprintln!("Server failed: {}", e); exit(1)});
+
+	let (_, success) = web_view::run("laspad", "", Some((512, 512)), true, true, move |webview| {
+		use web_view::*;
+
+		thread::spawn(move || {
+			webview.dispatch(|webview, _| {
+				webview.eval(r#"open('http://127.0.0.1:51823/', '_self', false)"#);
+				let path = webview.dialog(DialogType::Open, DialogFlags::Directory, "Choose laspad project folder", None);
+				if path.len() == 0 {
+					exit(0);
+				}
+				env::set_current_dir(path).unwrap();
+				webview.eval("init()");
+			});
+			thread::sleep(time::Duration::from_millis(100)); // to avoid segfault
+		});
+	}, |_, _, _| {thread::sleep(time::Duration::from_millis(500));}, ());
+
+	if !success {
+		eprintln!("Failed to execute webview");
+		exit(1);
+	} else {
+		exit(0);
+	}
+
 	Ok(())
 }
 
+const  ADDR: &'static str  = "127.0.0.1:51823";
 static HTML: &'static str  = include_str!("ui.html");
 static CSS:  &'static str  = include_str!("ui.css");
 static JS:   &'static str  = include_str!("ui.js");
