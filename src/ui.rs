@@ -107,8 +107,8 @@ impl server::Service for UI {
 		let resp = match (req.method(), req.path(), req.query()) {
 			(&Method::Get, path, None) => {
 				let (body, mime) = match path {
-					"/"             => (HTML, mime::TEXT_HTML_UTF_8),
-					"/index.css"    => (CSS,  mime::TEXT_CSS),
+					"/"             => (HTML.as_str(), mime::TEXT_HTML_UTF_8),
+					//"/index.css"    => (CSS,  mime::TEXT_CSS),
 					"/laspad-ui.js" => (JS,   mime::TEXT_JAVASCRIPT),
 					_               => {eprintln!("Invalid GET: {}", path); ("", mime::TEXT_PLAIN)},
 				};
@@ -182,6 +182,7 @@ pub fn main() -> Result<()> {
 	Ok(())
 }
 
-static HTML: &'static str  = include_str!("ui.html");
-static CSS:  &'static str  = include_str!("ui.css");
+lazy_static! {
+	static ref HTML: String = format!(include_str!("ui.html"), stylesheet = include_str!("ui.css"));
+}
 static JS:   &'static str  = include_str!("ui.js");
