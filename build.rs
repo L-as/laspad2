@@ -1,7 +1,7 @@
 extern crate curl;
 
 use std::io::Write;
-use std::fs::File;
+use std::fs::{self, File};
 use std::path::Path;
 
 use curl::easy::Easy;
@@ -9,6 +9,8 @@ use curl::easy::Easy;
 fn main() {
 	// Linking to steam's API
 	{
+		fs::create_dir_all("3rdparty").unwrap();
+
 		for &lib in [
 			"libsteam_api.so",
 			"steam_api64.dll",
