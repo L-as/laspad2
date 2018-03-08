@@ -123,7 +123,7 @@ impl server::Service for UI {
 					.with_body(body)
 				));
 			}
-			_ => {eprintln!("Invalid GET!"); "FIN"},
+			(method, path, query)           => {eprintln!("Invalid request: {}, {}, {:?}", method, path, query); "FIN"},
 		};
 
 		Box::new(future::ok(Self::Response::new()
