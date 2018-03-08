@@ -83,14 +83,14 @@ impl UI {
 		}
 	}
 
-	fn dispatch<F: FnOnce() -> Result<()> + Send + 'static>(&self, command: F) -> &'static str {
+	fn dispatch<F: FnOnce() -> Result<()> + Send + 'static>(&self, command: F) -> String {
 		thread::spawn(move || {
 			UILog::push(match command() {
 				Ok(())  => String::from("FIN"),
 				Err(e)  => format!("ERR{}", e),
 			});
 		});
-		""
+		String::new()
 	}
 }
 
@@ -101,35 +101,41 @@ impl server::Service for UI {
 	type Future   = Box<Future<Item=Self::Response, Error=Self::Error>>;
 
 	fn call(&self, req: Self::Request) -> Self::Future {
-		use hyper::{Method, header};
+		use hyper::{Method, header::*};
+		use mime;
 
-		let body = match (req.method(), req.path(), req.query()) {
-			(&Method::Get,  "/",               None)         => HTML,
-			(&Method::Get,  "/index.css",      None)         => CSS,
-			(&Method::Get,  "/laspad-ui.js",   None)         => JS,
-			(&Method::Post, "/exit",           None)         => exit(0),
-			(&Method::Post, "/create_project", None)         => self.dispatch(::init::main),
-			(&Method::Post, "/update",         None)         => self.dispatch(::update::main),
-			(&Method::Post, "/publish",        Some(branch)) => {let branch = branch.to_owned(); self.dispatch(move || ::publish::main(&branch, false))},
-			(&Method::Post, "/need",           Some(modid))  => {let modid  = modid .to_owned(); self.dispatch(move || ::need::main(&modid))},
-			(&Method::Post, command, query) => { // returns String instead of &'static str
-				let body = match command {
-					"/get_branches" => self.run(get_branches),
-					"/get_msg"      => UILog::remove(),
-					_               => {eprintln!("Invalid POST: {}, {:?}", command, query); String::from("ERRSomething went wrong, please retry")},
+		let resp = match (req.method(), req.path(), req.query()) {
+			(&Method::Get, path, None) => {
+				let (body, mime) = match path {
+					"/"             => (HTML, mime::TEXT_HTML_UTF_8),
+					"/index.css"    => (CSS,  mime::TEXT_CSS),
+					"/laspad-ui.js" => (JS,   mime::TEXT_JAVASCRIPT),
+					_               => {eprintln!("Invalid GET: {}", path); ("", mime::TEXT_PLAIN)},
 				};
-				return Box::new(future::ok(Self::Response::new()
-					.with_header(header::ContentLength(body.len() as u64))
+				Self::Response::new()
+					.with_header(ContentLength(body.len() as u64))
+					.with_header(Link::new(vec![LinkValue::new(path.to_owned()).set_media_type(mime)]))
 					.with_body(body)
-				));
-			}
-			(method, path, query)           => {eprintln!("Invalid request: {}, {}, {:?}", method, path, query); "FIN"},
+			},
+			(&Method::Post, command, query) => { // returns String instead of &'static str
+				let body = match (command, query) {
+					("/exit",           None)         => exit(0),
+					("/create_project", None)         => self.dispatch(::init::main),
+					("/update",         None)         => self.dispatch(::update::main),
+					("/publish",        Some(branch)) => {let branch = branch.to_owned(); self.dispatch(move || ::publish::main(&branch, false))},
+					("/need",           Some(modid))  => {let modid  = modid .to_owned(); self.dispatch(move || ::need::main(&modid))},
+					("/get_branches",   None)         => self.run(get_branches),
+					("/get_msg",        None)         => UILog::remove(),
+					_                                 => {eprintln!("Invalid POST: {}, {:?}", command, query); String::from("ERRSomething went wrong, please retry")},
+				};
+				Self::Response::new()
+					.with_header(ContentLength(body.len() as u64))
+					.with_body(body)
+			},
+			(method, path, query) => {eprintln!("Invalid request: {}, {}, {:?}", method, path, query); Self::Response::new()},
 		};
 
-		Box::new(future::ok(Self::Response::new()
-			.with_header(header::ContentLength(body.len() as u64))
-			.with_body(body)
-		))
+		Box::new(future::ok(resp))
 	}
 }
 

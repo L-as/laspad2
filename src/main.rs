@@ -28,6 +28,7 @@ extern crate web_view;
 extern crate termcolor;
 extern crate futures;
 extern crate hyper;
+extern crate mime;
 
 #[macro_use]
 mod logger;
