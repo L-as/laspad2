@@ -152,29 +152,26 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	log!(log, 1; "Zipping up files");
 	let zip = Vec::new();
 	let zip = {
-		use std::cell::RefCell;
-
 		let mut cursor = Cursor::new(zip);
-		let mut zip    = RefCell::new(zip::ZipWriter::new(cursor));
+		let mut zip    = zip::ZipWriter::new(cursor);
 
 		let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
-		zip.get_mut().start_file(".modinfo", options)?;
-		zip.get_mut().write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
+		zip.start_file(".modinfo", options)?;
+		zip.write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
 
-		compile::iterate_files(&Path::new("."), &mut |path, rel_path| {
-			log!(log, 2; "{} < {}", rel_path.display(), path.display());
-			let mut zip = zip.borrow_mut();
-			zip.start_file(rel_path.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
-			zip.write_all(&fs::read(path)?).expect("Could not write to zip archive!");
-			Ok(())
-		}, &mut |rel_path| {
-			log!(log, 2; "--- {} ---", rel_path.display());
-			//zip.borrow_mut().add_directory(rel_path.to_str()?, options)?;
-			Ok(())
-		})?;
+		compile::main()?;
+		for entry in fs::read_dir("compiled")? {
+			let entry = &entry?.path();
+			if entry.is_file() {
+				let rel = entry.strip_prefix("compiled")?;
+				log!(log, 2; "{} < {}", rel.display(), entry.display());
+				zip.start_file(rel.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
+				zip.write_all(&fs::read(entry)?).expect("Could not write to zip archive!");
+			}
+		};
 
-		zip.get_mut().finish()?.into_inner()
+		zip.finish()?.into_inner()
 	};
 
 	log!(log, 1; "Finished preparing preview and description");
