@@ -11,8 +11,8 @@ function log(msg, type) {
 }
 
 function set_active(active) {
-	let commands = Array.from(document.getElementsByClassName("command"));
-	let branches = Array.from(document.getElementsByClassName("branch"));
+	let commands = [].slice.call(document.getElementsByClassName("command"));
+	let branches = [].slice.call(document.getElementsByClassName("branch"));
 	let buttons = commands.concat(branches)
 	for (let i = 0; i < buttons.length; ++i) {
 		buttons[i].disabled = active
