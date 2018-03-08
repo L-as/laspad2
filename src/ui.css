@@ -16,6 +16,7 @@ body {
 	font-size:  3rem;
 	margin:     0.8vmin;
 	height:     100%;
+	color:      #2F2F2F;
 }
 
 .branch {
@@ -26,6 +27,7 @@ body {
 	border:     none;
 	font-size:  2rem;
 	background: #70433A;
+	color:      #2F2F2F;
 }
 
 #commandpanel {
@@ -58,6 +60,7 @@ body {
 	margin:    0.8vmin;
 	padding:   1em;
 	flex:      1;
+	color:     white;
 }
 
 .warning {
