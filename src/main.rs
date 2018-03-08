@@ -34,7 +34,6 @@ mod logger;
 mod steam;
 mod md_to_bb;
 mod ui;
-mod ui_static;
 mod common;
 
 // console commands

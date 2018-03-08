@@ -14,8 +14,6 @@ use futures::future::{self, Future};
 
 use logger::{self, Log};
 
-use ui_static::*;
-
 type Result<T> = ::std::result::Result<T, Error>;
 
 fn get_branches() -> Result<String> {
@@ -177,3 +175,7 @@ pub fn main() -> Result<()> {
 
 	Ok(())
 }
+
+static HTML: &'static str  = include_str!("ui.html");
+static CSS:  &'static str  = include_str!("ui.css");
+static JS:   &'static str  = include_str!("ui.js");
