@@ -5,7 +5,6 @@ use std::{
 	time,
 	env,
 	fs,
-	path::{PathBuf, Path},
 	fmt::Display,
 	process::exit,
 };
@@ -14,6 +13,8 @@ use hyper::{self, server};
 use futures::future::{self, Future};
 
 use logger::{self, Log};
+
+use ui_static::*;
 
 type Result<T> = ::std::result::Result<T, Error>;
 
@@ -172,14 +173,7 @@ pub fn main() -> Result<()> {
 	if !success {
 		eprintln!("Failed to execute webview");
 		exit(1);
-	} else {
-		exit(0);
 	}
 
 	Ok(())
 }
-
-const  ADDR: &'static str  = "127.0.0.1:51823";
-static HTML: &'static str  = include_str!("ui.html");
-static CSS:  &'static str  = include_str!("ui.css");
-static JS:   &'static str  = include_str!("ui.js");
