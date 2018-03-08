@@ -135,6 +135,10 @@ impl server::Service for UI {
 }
 
 pub fn main() -> Result<()> {
+	fn sleep() {
+		thread::sleep(time::Duration::from_millis(100)); // to avoid segfault
+	}
+
 	fn spawn_server() -> Result<()> {
 		let addr = "127.0.0.1:51823".parse()?;
 		let server = server::Http::new().bind(&addr, move || Ok(UI))?;
@@ -153,17 +157,17 @@ pub fn main() -> Result<()> {
 
 		thread::spawn(move || {
 			webview.dispatch(|webview, _| {
-				webview.eval(r#"open('http://127.0.0.1:51823/', '_self', false)"#);
 				let path = webview.dialog(DialogType::Open, DialogFlags::Directory, "Choose laspad project folder", None);
 				if path.len() == 0 {
 					exit(0);
 				}
 				env::set_current_dir(path).unwrap();
-				webview.eval("init()");
+				webview.eval(r#"open('http://127.0.0.1:51823/', '_self', false)"#);
+				sleep();
 			});
-			thread::sleep(time::Duration::from_millis(100)); // to avoid segfault
+			sleep();
 		});
-	}, |_, _, _| {thread::sleep(time::Duration::from_millis(500));}, ());
+	}, |_, _, _| {sleep()}, ());
 
 	if !success {
 		eprintln!("Failed to execute webview");

@@ -90,7 +90,4 @@ function get_branches(resp) {
 	}
 }
 
-// called from webview
-function init() {
-	command("/get_branches", get_branches)
-}
+command("/get_branches", get_branches)
