@@ -29,6 +29,7 @@ extern crate termcolor;
 extern crate futures;
 extern crate hyper;
 extern crate mime;
+//extern crate steamy_vdf as vdf;
 
 #[macro_use]
 mod logger;
@@ -44,10 +45,14 @@ mod need;
 mod update;
 mod compile;
 mod publish;
+mod launch;
 
-use std::process::exit;
-use std::io::Write;
-use std::env;
+use std::{
+	process::exit,
+	io::Write,
+	env,
+	str::FromStr,
+};
 
 use termcolor::{StandardStream, ColorChoice, ColorSpec, Color, WriteColor};
 
@@ -113,19 +118,17 @@ vice versa.")
 			(@arg BRANCH: "The branch to publish, defaults to master")
 			(@arg RETRY: -r --retry "Retry until success")
 		)
-		//(@subcommand launch =>
-		// 	(about: "Launches an external spark program with this mod")
-		//	(@setting SubcommandRequiredElseHelp)
-		//	(@setting VersionlessSubcommands)
-		//	(@subcommand ns2 =>
-		//		(about: "Launches NS2")
-		//	(@subcommand editor =>
-		//		(about: "Launches Editor")
-		//	)
-		//	(@subcommand builder =>
-		//		(about: "Launches Builder")
-		//	)
-		//)
+		(@subcommand launch =>
+			(about: "Launches an external spark program with this mod")
+			(@setting SubcommandRequiredElseHelp)
+			(@setting VersionlessSubcommands)
+			(@subcommand ns2 =>
+				(about: "Launches NS2 with this mod, making it active for any map you launch (local or remote), useful for testing")
+			)
+			(@subcommand editor =>
+				(about: "Launches Editor with this mod active (allows you to use entities from this mod)")
+			)
+		)
 	).get_matches();
 
 	logger::set_priority(-(matches.occurrences_of("VERBOSITY") as i64 + 1));
@@ -155,6 +158,7 @@ fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Er
 		("update",   Some(_)) =>  update::main(),
 		("compile",  Some(_)) => compile::main(),
 		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY")),
+		("launch",   Some(m)) =>  launch::main(launch::Program::from_str(m.subcommand_name().unwrap())?),
 		("download", Some(m)) => {
 			use std::fs;
 
