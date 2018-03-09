@@ -29,6 +29,7 @@ extern crate termcolor;
 extern crate futures;
 extern crate hyper;
 extern crate mime;
+extern crate walkdir;
 //extern crate steamy_vdf as vdf;
 
 #[macro_use]

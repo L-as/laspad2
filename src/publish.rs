@@ -152,6 +152,8 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	log!(log, 1; "Zipping up files");
 	let zip = Vec::new();
 	let zip = {
+		use walkdir::WalkDir;
+
 		let mut cursor = Cursor::new(zip);
 		let mut zip    = zip::ZipWriter::new(cursor);
 
@@ -161,8 +163,9 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		zip.write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
 
 		compile::main()?;
-		for entry in fs::read_dir("compiled")? {
-			let entry = &entry?.path();
+		for entry in WalkDir::new("compiled").follow_links(true) {
+			let entry = entry?;
+			let entry = entry.path(); // I have no idea why I have to do this in two statements
 			if entry.is_file() {
 				let rel = entry.strip_prefix("compiled")?;
 				log!(log, 2; "{} < {}", rel.display(), entry.display());

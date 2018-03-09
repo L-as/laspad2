@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 clap              = {version = "2", features = ["color"]}
+walkdir           = "2"
 lazy_static       = "1"
 serde             = "1"
 serde_derive      = "1"
