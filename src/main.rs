@@ -138,7 +138,11 @@ vice versa.")
 	logger::set(Box::new(log));
 
 	if let Err(e) = execute_command(&matches) {
-		elog!(log; "Fatal error: {}", e);
+		if cfg!(debug_assertions)  {
+			elog!(log; "Fatal error: {:?}", e);
+		} else {
+			elog!(log; "Fatal error: {}", e);
+		};
 		exit(1);
 	};
 }
