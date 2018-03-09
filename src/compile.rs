@@ -12,7 +12,7 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
 	F: FnMut(&Path, &Path) -> Result,
 	G: FnMut(&Path)        -> Result
 {
-	for entry in fs::read_dir(path)? {
+	for entry in fs::read_dir(path).with_context(|_e| format!("Could not iterate directory {}", path.display()))? {
 		let entry = &entry?.path();
 		if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
 			let rel = entry.strip_prefix(root)?;
@@ -71,7 +71,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 		};
 		if let Some(captures) = OUTPUT_RE.captures(modsettings) {
 			let s = path.join(&captures[1]);
-			if s.exists() && source.is_none() || &s != &source.unwrap() {
+			if s.exists() && (source.is_none() || &s != &source.unwrap()) {
 				found = true;
 				iterate_dir(&s, &s, f, g)?;
 			};
@@ -108,12 +108,13 @@ pub fn main() -> Result {
 
 	if dest.exists() {
 		fs::remove_dir_all(dest)?;
-		fs::create_dir(dest)?;
-	}
+	};
+
+	fs::create_dir(dest)?;
 
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
 		log!(log, 2; "{} < {}", rel_path.display(), path.display());
-		let dest = dest.join(rel_path);
+		let dest = &dest.join(rel_path);
 		if let Err(e) = fs::hard_link(path, dest) {
 			if e.kind() == io::ErrorKind::AlreadyExists {
 				elog!(log; "Multiple mods have file {}!", rel_path.display());
