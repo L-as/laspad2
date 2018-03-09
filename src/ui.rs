@@ -162,6 +162,7 @@ pub fn main() -> Result<()> {
 
 		thread::spawn(move || {
 			webview.dispatch(|webview, _| {
+				sleep();
 				let path = webview.dialog(DialogType::Open, DialogFlags::Directory, "Choose laspad project folder", None);
 				if path.len() == 0 {
 					exit(0);
