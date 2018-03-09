@@ -1,0 +1,1 @@
+laspad-gui %* | cat
