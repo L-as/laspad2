@@ -1,54 +1,47 @@
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::Read;
 use std::path::Path;
 use failure::*;
+use walkdir::WalkDir;
 
 use common;
 
 type Result = ::std::result::Result<(), Error>;
 
-fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
-	where
-	F: FnMut(&Path, &Path) -> Result,
-	G: FnMut(&Path)        -> Result
+fn iterate_dir<F>(root: &Path, path: &Path, f: &mut F) -> Result
+	where F: FnMut(&Path, &Path) -> Result
 {
-	for entry in fs::read_dir(path).with_context(|_e| format!("Could not iterate directory {}", path.display()))? {
-		let entry = &entry?.path();
-		if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
-			let rel = entry.strip_prefix(root)?;
-			if entry.is_dir() {
-				g(rel)?;
-				iterate_dir(root, entry, f, g)?;
-			} else {
-				f(entry, rel)?;
-			};
-		} else {
-			log!(2; "Ignored file {}", entry.display());
-		};
+	for entry in WalkDir::new(path)
+		.into_iter()
+		.filter_entry(|e| e.file_name().to_str().map_or(false, |s| s.chars().next() == Some('.')))
+	{
+		let entry = entry?;
+		let entry = entry.path();
+		let rel   = entry.strip_prefix(root)?;
+		f(entry, rel)?;
 	};
+
 	Ok(())
 }
 
-pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
-	where
-	F: FnMut(&Path, &Path) -> Result,
-	G: FnMut(&Path)        -> Result
+fn iterate_files<F>(path: &Path, f: &mut F) -> Result
+	where F: FnMut(&Path, &Path) -> Result
 {
 	if path.join(".update_timestamp").exists() {
 		log!(2; ".update_timestamp exists in {}", path.display());
-		iterate_dir(path, path, f, g)?;
+		iterate_dir(path, path, f)?;
 	} else if path.join("laspad.toml").exists() {
 		log!(2; "laspad.toml exists in {}", path.display());
 		let src = &path.join("src");
 		if src.exists() {
-			iterate_dir(src, src, f, g)?;
+			iterate_dir(src, src, f)?;
 		} else {
 			elog!(1; "Found no source directory in {}", path.display());
 		};
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
-				iterate_files(&dependency?.path(), f, g)?;
+				iterate_files(&dependency?.path(), f)?;
 			};
 		};
 	} else if path.join("mod.settings").exists() {
@@ -65,7 +58,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			let s = path.join(&captures[1]);
 			if s.exists() {
 				found = true;
-				iterate_dir(&s, &s, f, g)?;
+				iterate_dir(&s, &s, f)?;
 			};
 			source = Some(s.clone());
 		};
@@ -73,7 +66,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			let s = path.join(&captures[1]);
 			if s.exists() && (source.is_none() || &s != &source.unwrap()) {
 				found = true;
-				iterate_dir(&s, &s, f, g)?;
+				iterate_dir(&s, &s, f)?;
 			};
 		};
 		if !found {
@@ -91,11 +84,11 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			if source_dir.exists() {
 				found = true;
 				log!(2; "Found {} in {}", source_dir.display(), path.display());
-				iterate_dir(source_dir, source_dir, f, g)?;
+				iterate_dir(source_dir, source_dir, f)?;
 			};
 		};
 		if !found {
-			iterate_dir(path, path, f, g)?;
+			iterate_dir(path, path, f)?;
 		};
 	};
 	Ok(())
@@ -115,21 +108,18 @@ pub fn main() -> Result {
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
 		log!(2; "{} < {}", rel_path.display(), path.display());
 		let dest = &dest.join(rel_path);
-		if let Err(e) = fs::hard_link(path, dest) {
-			if e.kind() == io::ErrorKind::AlreadyExists {
-				elog!("Multiple mods have file {}!", rel_path.display());
-				Ok(())
-			} else {
-				bail!(e);
-			}
+		if path.is_dir() {
+			log!(2; "---- {} ----", rel_path.display());
+			fs::create_dir_all(dest).with_context(|_| {
+				format!("Could not create directory {}", rel_path.display())
+			})?;
 		} else {
-			Ok(())
-		}
-	}, &mut |rel_path| {
-		log!(2; "--- {} ---", rel_path.display());
-		fs::create_dir_all(dest.join(rel_path)).with_context(|_| {
-			format!("Could not create directory {}", rel_path.display())
-		})?;
+			if path.exists() {
+				elog!("Multiple mods have file {}!", rel_path.display());
+			} else {
+				fs::hard_link(path, dest)?;
+			};
+		};
 		Ok(())
 	})
 }
