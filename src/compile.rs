@@ -23,7 +23,7 @@ fn iterate_dir<F, G>(root: &Path, path: &Path, f: &mut F, g: &mut G) -> Result
 				f(entry, rel)?;
 			};
 		} else {
-			log!(log, 2; "Ignored file {}", entry.display());
+			log!(2; "Ignored file {}", entry.display());
 		};
 	};
 	Ok(())
@@ -35,15 +35,15 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 	G: FnMut(&Path)        -> Result
 {
 	if path.join(".update_timestamp").exists() {
-		log!(log, 2; ".update_timestamp exists in {}", path.display());
+		log!(2; ".update_timestamp exists in {}", path.display());
 		iterate_dir(path, path, f, g)?;
 	} else if path.join("laspad.toml").exists() {
-		log!(log, 2; "laspad.toml exists in {}", path.display());
+		log!(2; "laspad.toml exists in {}", path.display());
 		let src = &path.join("src");
 		if src.exists() {
 			iterate_dir(src, src, f, g)?;
 		} else {
-			elog!(log, 1; "Found no source directory in {}", path.display());
+			elog!(1; "Found no source directory in {}", path.display());
 		};
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
@@ -52,7 +52,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			};
 		};
 	} else if path.join("mod.settings").exists() {
-		log!(log, 2; "mod.settings exists in {}", path.display());
+		log!(2; "mod.settings exists in {}", path.display());
 		use regex::Regex;
 		lazy_static! {
 			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
@@ -77,10 +77,10 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			};
 		};
 		if !found {
-			elog!(log; "Found no source directory in {}", path.display());
+			elog!("Found no source directory in {}", path.display());
 		};
 	} else { // just guess
-		log!(log, 2; "Guessing source directory in {}", path.display());
+		log!(2; "Guessing source directory in {}", path.display());
 		let mut found = false;
 		for source_dir in [
 			"source",
@@ -90,7 +90,7 @@ pub fn iterate_files<F, G>(path: &Path, f: &mut F, g: &mut G) -> Result
 			let source_dir = &path.join(source_dir);
 			if source_dir.exists() {
 				found = true;
-				log!(log, 2; "Found {} in {}", source_dir.display(), path.display());
+				log!(2; "Found {} in {}", source_dir.display(), path.display());
 				iterate_dir(source_dir, source_dir, f, g)?;
 			};
 		};
@@ -113,11 +113,11 @@ pub fn main() -> Result {
 	fs::create_dir(dest)?;
 
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
-		log!(log, 2; "{} < {}", rel_path.display(), path.display());
+		log!(2; "{} < {}", rel_path.display(), path.display());
 		let dest = &dest.join(rel_path);
 		if let Err(e) = fs::hard_link(path, dest) {
 			if e.kind() == io::ErrorKind::AlreadyExists {
-				elog!(log; "Multiple mods have file {}!", rel_path.display());
+				elog!("Multiple mods have file {}!", rel_path.display());
 				Ok(())
 			} else {
 				bail!(e);
@@ -126,7 +126,7 @@ pub fn main() -> Result {
 			Ok(())
 		}
 	}, &mut |rel_path| {
-		log!(log, 2; "--- {} ---", rel_path.display());
+		log!(2; "--- {} ---", rel_path.display());
 		fs::create_dir_all(dest.join(rel_path)).with_context(|_| {
 			format!("Could not create directory {}", rel_path.display())
 		})?;

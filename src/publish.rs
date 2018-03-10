@@ -142,14 +142,14 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		steam::Item(u64::from_str_radix(&fs::read_string(&modid_file).context("Could not read the modid file")?, 16)?)
 	} else {
 		let item = create_workshop_item(&mut remote, &mut utils)?;
-		log!(log, 1; "Created Mod ID: {:X}", item.0);
+		log!(1; "Created Mod ID: {:X}", item.0);
 		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
 
 	update::main()?;
 
-	log!(log, 1; "Zipping up files");
+	log!(1; "Zipping up files");
 	let zip = Vec::new();
 	let zip = {
 		use walkdir::WalkDir;
@@ -168,7 +168,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 			let entry = entry.path(); // I have no idea why I have to do this in two statements
 			if entry.is_file() {
 				let rel = entry.strip_prefix("compiled")?;
-				log!(log, 2; "{} < {}", rel.display(), entry.display());
+				log!(2; "{} < {}", rel.display(), entry.display());
 				zip.start_file(rel.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
 				zip.write_all(&fs::read(entry)?).expect("Could not write to zip archive!");
 			}
@@ -177,7 +177,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		zip.finish()?.into_inner()
 	};
 
-	log!(log, 1; "Finished preparing preview and description");
+	log!(1; "Finished preparing preview and description");
 	let mut preview = fs::read(&*branch.preview).context("Could not read preview")?;
 	if preview.len() == 0 { // Steam craps itself when it has 0 length
 		preview.push(0);
@@ -193,30 +193,30 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		description
 	};
 
-	log!(log, 1; "Uploading zip");
+	log!(1; "Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
 		bail!(PublishError::CantUploadMod);
 	};
 
-	log!(log, 1; "Uploading preview");
+	log!(1; "Uploading preview");
 	if remote.file_write("laspad_preview", &preview).is_err() {
 		bail!(PublishError::CantUploadPreview);
 	};
 
 	let mut request_update = || {
-		log!(log, 1; "Requesting workshop item update");
+		log!(1; "Requesting workshop item update");
 		let u = remote.update_workshop_file(item);
 		if u.title(&branch.name).is_err() {
-			elog!(log; "Could not update title");
+			elog!("Could not update title");
 		};
 		if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
-			elog!(log; "Could not update tags");
+			elog!("Could not update tags");
 		};
 		if u.description(&description).is_err() {
-			elog!(log; "Could not update description");
+			elog!("Could not update description");
 		};
 		if u.preview("laspad_preview").is_err() {
-			elog!(log; "Could not update preview");
+			elog!("Could not update preview");
 		};
 		if u.contents("laspad_mod.zip").is_err() {
 			bail!(PublishError::CantUpdateMod);
@@ -226,7 +226,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 			let head = repo.head()?;
 			let oid = head.peel_to_commit()?.id();
 			if u.change_description(&format!("git commit: {}", oid)).is_err() {
-				elog!(log; "Could not update version history");
+				elog!("Could not update version history");
 			};
 		};
 		let apicall = u.commit();
@@ -235,7 +235,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 
 		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item));
 		if let Ok(item) = result {
-			log!(log; "Published mod: {}", item);
+			log!("Published mod: {}", item);
 		};
 
 		Ok(result?)

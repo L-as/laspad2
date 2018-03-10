@@ -73,22 +73,22 @@ pub fn log(priority: i64, line: &str) {
 
 
 macro_rules! elog {
-	($log:ident, $priority:expr; $($arg:tt)*) => {{
+	($priority:expr; $($arg:tt)*) => {{
 		let priority = i64::max_value().overflowing_sub($priority).0;
 		if priority >= $crate::logger::get_priority() {
 			$crate::logger::log(i64::max_value().overflowing_sub($priority).0, &format!($($arg)*));
 		};
 	}};
-	($log:ident; $($arg:tt)*) => {{
-		elog!($log, 0; $($arg)*);
+	($($arg:tt)*) => {{
+		elog!(0; $($arg)*);
 	}}
 }
 
 macro_rules! log {
-	($log:ident, $verbosity:expr; $($arg:tt)*) => {
-		elog!($log, i64::max_value().overflowing_add($verbosity).0; $($arg)*);
+	($verbosity:expr; $($arg:tt)*) => {
+		elog!(i64::max_value().overflowing_add($verbosity).0; $($arg)*);
 	};
-	($log:ident; $($arg:tt)*) => {
-		log!($log, 0; $($arg)*);
+	($($arg:tt)*) => {
+		log!(0; $($arg)*);
 	}
 }

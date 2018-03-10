@@ -143,9 +143,9 @@ vice versa.")
 
 	if let Err(e) = execute_command(&matches) {
 		if cfg!(debug_assertions)  {
-			elog!(log; "Fatal error: {:?}", e);
+			elog!("Fatal error: {:?}", e);
 		} else {
-			elog!(log; "Fatal error: {}", e);
+			elog!("Fatal error: {}", e);
 		};
 		exit(1);
 	};

@@ -16,7 +16,7 @@ pub fn main() -> Result {
 
 	File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;
 
-	log!(log; "Example laspad.toml created. Please modify it.");
+	log!("Example laspad.toml created. Please modify it.");
 
 	fs::create_dir_all("src")?;
 

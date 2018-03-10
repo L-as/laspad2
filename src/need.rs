@@ -38,6 +38,6 @@ pub fn main(dep: &str) -> Result {
 			.write_all(format!("/dependencies/{}/*\n!/dependencies/{}/.laspad_dummy\n", dep, dep).as_bytes())?;
 	};
 
-	log!(log; "Added {} as dependency; NB: Contents are not downloaded automatically: you must update first!", dep);
+	log!("Added {} as dependency; NB: Contents are not downloaded automatically: you must update first!", dep);
 	Ok(())
 }
