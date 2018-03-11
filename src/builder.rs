@@ -35,6 +35,20 @@ impl Builder {
 						cmd:     cmd!((get_ns2().join("Overview.exe")) (src) compiled),
 					})
 				},
+				"psd"   => {
+					let dst = dst.with_extension("dds");
+					let cmd = if src.ends_with("_normal.psd") {
+						cmd!((get_ns2().join("../utils/nvcompress")) (-normal) (-bc1) (src) (self.new.join(&dst)))
+					} else {
+						cmd!((get_ns2().join("../utils/nvcompress"))           (-bc3) (src) (self.new.join(&dst)))
+					};
+					let outputs = vec![dst];
+
+					Some(Rule {
+						outputs: outputs,
+						cmd:     cmd,
+					})
+				},
 				_ => None,
 			}
 		} else {
