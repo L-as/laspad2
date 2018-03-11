@@ -1,4 +1,7 @@
-use std::{path::Path, env};
+use std::{
+	path::{Path, PathBuf},
+	env
+};
 use failure::*;
 
 pub fn find_project() -> Result<(), Error> {
@@ -10,4 +13,14 @@ pub fn find_project() -> Result<(), Error> {
 		};
 	};
 	Ok(())
+}
+
+#[cfg(windows)]
+pub fn get_ns2() -> PathBuf {
+	PathBuf::from("C:/Program Files (x86)/Steam/steamapps/common/Natural Selection 2/x64")
+}
+
+#[cfg(not(windows))]
+pub fn get_ns2() -> PathBuf {
+	Path::new(&env::var("HOME").unwrap()).join(".local/share/Steam/steamapps/common/Natural Selection 2/x64")
 }

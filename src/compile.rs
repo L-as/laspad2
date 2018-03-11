@@ -1,10 +1,14 @@
-use std::fs::{self, File};
-use std::io::Read;
-use std::path::Path;
+use std::{
+	fs::{self, File},
+	io::Read,
+	path::Path,
+};
 use failure::*;
 use walkdir::WalkDir;
+use mktemp::Temp;
 
 use common;
+use builder::Builder;
 
 type Result = ::std::result::Result<(), Error>;
 
@@ -99,11 +103,19 @@ pub fn main() -> Result {
 
 	let dest = Path::new("compiled");
 
-	if dest.exists() {
-		fs::remove_dir_all(dest)?;
-	};
-
+	// We can copy from this location if the files are still valid.
+	// This is useful for e.g. overviews, since if a bundled map doesn't change
+	// there will be no reason to regenerate it. Then it can simply be
+	// copied over from the old directory. If not, the old one will simply
+	// disappear at the end of this scope.
+	let old = if dest.exists() {
+		let dir = Temp::new();
+		fs::rename(dest, &dir)?;
+		Some(dir)
+	} else {None};
 	fs::create_dir(dest)?;
+
+	let mut builder = Builder::new(dest.to_path_buf(), old.map(|o| o.to_path_buf()));
 
 	iterate_files(&Path::new("."), &mut |path, rel_path| {
 		log!(2; "{} < {}", rel_path.display(), path.display());
@@ -117,9 +129,11 @@ pub fn main() -> Result {
 			if path.exists() {
 				elog!("Multiple mods have file {}!", rel_path.display());
 			} else {
-				fs::hard_link(path, dest)?;
+				builder.build(path, rel_path)?;
 			};
 		};
 		Ok(())
-	})
+	})?;
+
+	builder.build_rest()
 }

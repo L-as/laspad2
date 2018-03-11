@@ -1,8 +1,10 @@
 #![feature(extern_types)]
 #![feature(fs_read_write)]
 #![feature(slice_concat_ext)]
+
 #![allow(safe_packed_borrows)]
 #![deny(unused_must_use)]
+
 #![windows_subsystem = "windows"]
 
 #[macro_use]
@@ -15,6 +17,8 @@ extern crate lazy_static;
 extern crate failure;
 #[macro_use]
 extern crate downcast;
+#[macro_use]
+extern crate command_macros;
 
 extern crate toml;
 extern crate serde;
@@ -30,6 +34,7 @@ extern crate futures;
 extern crate hyper;
 extern crate mime;
 extern crate walkdir;
+extern crate mktemp;
 //extern crate steamy_vdf as vdf;
 
 #[macro_use]
@@ -39,6 +44,7 @@ mod steam;
 mod md_to_bb;
 mod ui;
 mod common;
+mod builder;
 
 // console commands
 mod init;

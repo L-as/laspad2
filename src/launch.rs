@@ -1,5 +1,4 @@
 use std::{
-	path::{Path, PathBuf},
 	str::FromStr,
 	process::Command,
 	env,
@@ -10,6 +9,8 @@ use std::{
 //use vdf;
 
 use failure::*;
+
+use common::*;
 
 type Result<T> = ::std::result::Result<T, Error>;
 
@@ -40,25 +41,20 @@ impl FromStr for Program {
 }
 
 pub fn main(program: Program) -> Result<()> {
+	find_project()?;
 	::compile::main()?;
 
-	let path = if cfg!(windows) {
-		PathBuf::from("C:/Program Files (x86)/Steam/steamapps/common/Natural Selection 2/x64")
-	} else {
-		Path::new(&env::var("HOME")?).join(".local/share/Steam/steamapps/common/Natural Selection 2/x64")
-	};
+	let path = get_ns2();
 
-	{
-		#[cfg(windows)]
-		use std::os::windows::fs::symlink_dir as symlink;
-		#[cfg(not(windows))]
-		use std::os::unix::fs::symlink as symlink;
+	#[cfg(windows)]
+	use std::os::windows::fs::symlink_dir as symlink;
+	#[cfg(not(windows))]
+	use std::os::unix::fs::symlink as symlink;
 
-		let mod_dir = &path.join("../laspad_mod");
-		if mod_dir.exists() {fs::remove_file(mod_dir)?};
-		let compiled = env::current_dir()?.join("compiled");
-		symlink(compiled, mod_dir)?;
-	}
+	let mod_dir = &path.join("../laspad_mod");
+	if mod_dir.exists() {fs::remove_file(mod_dir)?};
+	let compiled = env::current_dir()?.join("compiled");
+	symlink(compiled, mod_dir)?;
 
 	let current_dir = env::current_dir()?;
 	env::set_current_dir(path)?;
