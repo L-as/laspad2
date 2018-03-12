@@ -84,8 +84,9 @@ impl Builder {
 
 	pub fn build_rest(&mut self) -> Result<()> {
 		assert!(!self.rest_built);
-		for &(ref src, ref dst) in self.rest.iter() {
-			fs::hard_link(src, self.new.join(dst))?;
+		for &(ref src, ref path) in self.rest.iter() {
+			let dst = self.new.join(path);
+			fs::hard_link(src, dst)?;
 		};
 		self.rest_built = true;
 		Ok(())

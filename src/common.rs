@@ -22,5 +22,5 @@ pub fn get_ns2() -> PathBuf {
 
 #[cfg(not(windows))]
 pub fn get_ns2() -> PathBuf {
-	Path::new(&env::var("HOME").unwrap()).join(".local/share/Steam/steamapps/common/Natural Selection 2/x64")
+	Path::new(&env::var_os("HOME").unwrap()).join(".local/share/Steam/steamapps/common/Natural Selection 2/x64")
 }
