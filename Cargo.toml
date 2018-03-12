@@ -25,7 +25,7 @@ git2              = "*"
 regex             = "*"
 toml              = "*"
 curl              = "*"
-web-view          = {version = ">=0.1", path = "webview"}
+web-view          = {git = "https://github.com/Laaas/web-view.git"}
 failure           = "*"
 termcolor         = "*"
 
