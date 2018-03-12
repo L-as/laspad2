@@ -84,11 +84,12 @@ impl Builder {
 
 	pub fn build_rest(&mut self) -> Result<()> {
 		assert!(!self.rest_built);
+		self.rest_built = true;
 		for &(ref src, ref path) in self.rest.iter() {
-			let dst = self.new.join(path);
+			let dst = &self.new.join(path);
+			if dst.exists() {fs::remove_file(dst)?};
 			fs::hard_link(src, dst)?;
 		};
-		self.rest_built = true;
 		Ok(())
 	}
 }
