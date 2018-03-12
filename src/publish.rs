@@ -38,26 +38,29 @@ struct Branch {
 	autodescription: bool,
 	description:     Box<str>,
 	preview:         Box<str>,
+	website:         Option<Box<str>>,
 }
 
-pub fn generate_description(item: steam::Item) -> Result<String> {
+pub fn generate_description(item: steam::Item, website: Option<&str>) -> Result<String> {
 	let mut s: String = format!(
 		"[b]Mod ID: {}[/b]\n\n",
 		item
 	);
 
-	if Path::new(".git").exists() {
+	if Path::new(".git").exists() && website.is_some() {
 		let repo = Repository::open(".")?;
-		if let Ok(origin) = repo.find_remote("origin") {
-			let origin = origin.url().unwrap();
-			let head   = repo.head()?;
-			let oid    = head.peel_to_commit()?.id();
-			s.push_str(&format!(
-				"[b][url={}]git repository[/url][/b]\ncurrent git commit: {}\n\n",
-				origin,
-				oid
-			));
-		};
+		let head   = repo.head()?;
+		let oid    = head.peel_to_commit()?.id();
+		s.push_str(&format!(
+			"[b][url={}]git repository[/url][/b]\ncurrent git commit: {}\n\n",
+			website.unwrap(),
+			oid
+		));
+	} else if website.is_some() {
+		s.push_str(&format!(
+			"[b][url={}]website[/url][/b]\n\n",
+			website.unwrap()
+		));
 	};
 
 	if Path::new("dependencies").exists() {
@@ -186,7 +189,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	let description = md_to_bb::convert(&fs::read_string(&*branch.description).context("Could not read description")?);
 
 	let description = if branch.autodescription {
-		let mut s = generate_description(item)?;
+		let mut s = generate_description(item, branch.website.as_ref().map(|b| b.as_ref()))?;
 		s.push_str(&description);
 		s
 	} else {
