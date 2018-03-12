@@ -35,17 +35,17 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 		iterate_dir(path, f)?;
 	} else if path.join("laspad.toml").exists() {
 		log!(2; "laspad.toml exists in {}", path.display());
-		let src = &path.join("src");
-		if src.exists() {
-			iterate_dir(src, f)?;
-		} else {
-			elog!(1; "Found no source directory in {}", path.display());
-		};
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
 				iterate_files(&dependency?.path(), f)?;
 			};
+		};
+		let src = &path.join("src");
+		if src.exists() {
+			iterate_dir(src, f)?;
+		} else {
+			elog!(1; "Found no source directory in {}", path.display());
 		};
 	} else if path.join("mod.settings").exists() {
 		log!(2; "mod.settings exists in {}", path.display());
