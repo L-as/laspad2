@@ -8,6 +8,7 @@ function log(msg, type) {
 	node.className = type
 	let log = document.getElementById("log")
 	log.appendChild(node)
+	log.scrollTop = log.scrollHeight
 }
 
 function set_active(active) {
