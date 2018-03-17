@@ -1,17 +1,13 @@
 use std::{
 	str::FromStr,
 	process::Command,
-	path::PathBuf,
 	env,
 	fmt,
-	fs,
 };
 
 //use vdf;
 
 use failure::*;
-
-use common::*;
 
 type Result<T> = ::std::result::Result<T, Error>;
 
@@ -42,20 +38,7 @@ impl FromStr for Program {
 }
 
 pub fn main(root: Option<&str>, program: Program) -> Result<()> {
-	find_project()?;
-	::compile::main()?;
-
-	let path = root.map_or_else(|| get_ns2(), |root| PathBuf::from(root));
-
-	#[cfg(windows)]
-	use std::os::windows::fs::symlink_dir as symlink;
-	#[cfg(not(windows))]
-	use std::os::unix::fs::symlink as symlink;
-
-	let mod_dir = &path.join("../laspad_mod");
-	if mod_dir.exists() {fs::remove_file(mod_dir)?};
-	let compiled = env::current_dir()?.join("compiled");
-	symlink(compiled, mod_dir)?;
+	let path = ::prepare::main(root)?;
 
 	let current_dir = env::current_dir()?;
 	env::set_current_dir(path)?;
@@ -79,6 +62,8 @@ pub fn main(root: Option<&str>, program: Program) -> Result<()> {
 	env::set_current_dir(current_dir)?;
 
 	ensure!(status.success(), "{} failed: {}", program, status);
+
+	println!("laspad: Successfully ran {}", program);
 
 	Ok(())
 }

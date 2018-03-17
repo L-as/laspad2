@@ -53,6 +53,7 @@ mod update;
 mod compile;
 mod publish;
 mod launch;
+mod prepare;
 
 use std::{
 	process::exit,
@@ -125,11 +126,15 @@ vice versa.")
 			(@arg BRANCH: "The branch to publish, defaults to master")
 			(@arg RETRY: -r --retry "Retry until success")
 		)
+		(@subcommand prepare =>
+			(about: "Runs `compile` and allows you to launch any Spark program with this mod by passing `-game laspad_mod` to it")
+			(@arg NS2ROOT: +takes_value -r --root "The root of the NS2 installation directory")
+		)
 		(@subcommand launch =>
 			(about: "Launches an external spark program with this mod")
 			(@setting SubcommandRequiredElseHelp)
 			(@setting VersionlessSubcommands)
-			(@arg NS2ROOT: -r --root "The root of the NS2 installation directory")
+			(@arg NS2ROOT: +takes_value -r --root "The root of the NS2 installation directory")
 			(@subcommand ns2 =>
 				(about: "Launches NS2 with this mod, making it active for any map you launch (local or remote), useful for testing")
 			)
@@ -167,6 +172,7 @@ fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Er
 		("compile",  Some(_)) => compile::main(),
 		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY")),
 		("launch",   Some(m)) =>  launch::main(m.value_of("NS2ROOT"), launch::Program::from_str(m.subcommand_name().unwrap())?),
+		("prepare",  Some(m)) => prepare::main(m.value_of("NS2ROOT")).map(|_| ()),
 		("download", Some(m)) => {
 			use std::fs;
 
