@@ -129,6 +129,7 @@ vice versa.")
 			(about: "Launches an external spark program with this mod")
 			(@setting SubcommandRequiredElseHelp)
 			(@setting VersionlessSubcommands)
+			(@arg NS2ROOT: -r --root "The root of the NS2 installation directory")
 			(@subcommand ns2 =>
 				(about: "Launches NS2 with this mod, making it active for any map you launch (local or remote), useful for testing")
 			)
@@ -161,11 +162,11 @@ fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Er
 	match matches.subcommand() {
 		("",         None)    =>      ui::main(),
 		("init",     Some(_)) =>    init::main(),
-		("need",     Some(m)) =>    need::main(m.value_of("MODID" ).unwrap()),
+		("need",     Some(m)) =>    need::main(m.value_of("MODID").unwrap()),
 		("update",   Some(_)) =>  update::main(),
 		("compile",  Some(_)) => compile::main(),
 		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY")),
-		("launch",   Some(m)) =>  launch::main(launch::Program::from_str(m.subcommand_name().unwrap())?),
+		("launch",   Some(m)) =>  launch::main(m.value_of("NS2ROOT"), launch::Program::from_str(m.subcommand_name().unwrap())?),
 		("download", Some(m)) => {
 			use std::fs;
 

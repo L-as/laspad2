@@ -1,6 +1,7 @@
 use std::{
 	str::FromStr,
 	process::Command,
+	path::PathBuf,
 	env,
 	fmt,
 	fs,
@@ -23,8 +24,8 @@ pub enum Program {
 impl fmt::Display for Program {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		f.write_str(match *self {
-			Program::NS2     => "ns2",
-			Program::Editor  => "editor",
+			Program::NS2    => "ns2",
+			Program::Editor => "editor",
 		})
 	}
 }
@@ -33,18 +34,18 @@ impl FromStr for Program {
 	type Err = Error;
 	fn from_str(s: &str) -> Result<Self> {
 		match s {
-			"ns2"     => Ok(Program::NS2),
-			"editor"  => Ok(Program::Editor),
-			_         => Err(format_err!("{} is not a valid Spark program", s)),
+			"ns2"    => Ok(Program::NS2),
+			"editor" => Ok(Program::Editor),
+			_        => Err(format_err!("{} is not a valid Spark program", s)),
 		}
 	}
 }
 
-pub fn main(program: Program) -> Result<()> {
+pub fn main(root: Option<&str>, program: Program) -> Result<()> {
 	find_project()?;
 	::compile::main()?;
 
-	let path = get_ns2();
+	let path = root.map_or_else(|| get_ns2(), |root| PathBuf::from(root));
 
 	#[cfg(windows)]
 	use std::os::windows::fs::symlink_dir as symlink;
@@ -72,7 +73,7 @@ pub fn main(program: Program) -> Result<()> {
 				.arg("-game")
 				.arg("laspad_mod")
 				.status()?
-		}
+		},
 	};
 
 	env::set_current_dir(current_dir)?;
