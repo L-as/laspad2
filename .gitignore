@@ -10,4 +10,3 @@ laspad.7z
 
 /target/
 **/*.rs.bk
-Cargo.lock
