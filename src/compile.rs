@@ -33,8 +33,8 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 	if path.join(".update_timestamp").exists() {
 		log!(2; ".update_timestamp exists in {}", path.display());
 		iterate_dir(path, f)?;
-	} else if path.join("laspad.toml").exists() {
-		log!(2; "laspad.toml exists in {}", path.display());
+	} else if common::is_laspad_project(path) {
+		log!(2; "laspad project exists in {}", path.display());
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {

@@ -1,10 +1,8 @@
 use web_view;
-use toml;
 use std::{
 	thread,
 	time,
 	env,
-	fs,
 	fmt::Display,
 	process::exit,
 };
@@ -13,14 +11,14 @@ use hyper::{self, server};
 use futures::future::{self, Future};
 
 use logger::{self, Log};
+use config;
 
 type Result<T> = ::std::result::Result<T, Error>;
 
 fn get_branches() -> Result<String> {
 	use std::slice::SliceConcatExt;
 
-	let toml: toml::Value = fs::read_string("laspad.toml")?.parse()?;
-	Ok(toml.as_table().ok_or_else(|| format_err!("laspad.toml is incorrectly formatted"))?.keys().map(|s| s.as_str()).collect::<Vec<&str>>().as_slice().join(""))
+	Ok(config::get()?.branches().as_slice().join(""))
 }
 
 struct UI;
@@ -120,7 +118,7 @@ impl server::Service for UI {
 			(&Method::Post, command, query) => { // returns String instead of &'static str
 				let body = match (command, query) {
 					("/exit",           None)         => exit(0),
-					("/create_project", None)         => self.dispatch(::init::main),
+					("/create_project", None)         => self.dispatch(|| ::init::main(false)),
 					("/update",         None)         => self.dispatch(::update::main),
 					("/publish",        Some(branch)) => {let branch = branch.to_owned(); self.dispatch(move || ::publish::main(&branch, false))},
 					("/need",           Some(modid))  => {let modid  = modid .to_owned(); self.dispatch(move || ::need::main(&modid))},

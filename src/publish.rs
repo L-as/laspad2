@@ -1,17 +1,16 @@
 use std::path::{Path, PathBuf};
-use std::fs::{self, File};
-use std::io::{Read, Write, Cursor};
+use std::fs;
+use std::io::{Write, Cursor};
 use std::result::Result as StdResult;
 use failure::*;
 use zip;
 use git2::Repository;
-use toml;
 
 use steam::{GeneralError as SteamError, self};
 use update;
 use compile;
-use md_to_bb;
 use common;
+use config;
 
 #[derive(Debug, Fail)]
 pub enum PublishError {
@@ -30,78 +29,6 @@ pub enum PublishError {
 }
 
 type Result<T> = ::std::result::Result<T, Error>;
-
-#[derive(Deserialize)]
-struct Branch {
-	name:            Box<str>,
-	tags:            Vec<Box<str>>,
-	autodescription: bool,
-	description:     Box<str>,
-	preview:         Box<str>,
-	website:         Option<Box<str>>,
-}
-
-pub fn generate_description(item: steam::Item, website: Option<&str>) -> Result<String> {
-	let mut s: String = format!(
-		"[b]Mod ID: {}[/b]\n\n",
-		item
-	);
-
-	if Path::new(".git").exists() && website.is_some() {
-		let repo = Repository::open(".")?;
-		let head   = repo.head()?;
-		let oid    = head.peel_to_commit()?.id();
-		s.push_str(&format!(
-			"[b][url={}]git repository[/url][/b]\ncurrent git commit: {}\n\n",
-			website.unwrap(),
-			oid
-		));
-	} else if website.is_some() {
-		s.push_str(&format!(
-			"[b][url={}]website[/url][/b]\n\n",
-			website.unwrap()
-		));
-	};
-
-	if Path::new("dependencies").exists() {
-		s.push_str("Mods included: [list]\n");
-		for dependency in fs::read_dir("dependencies").expect("Couldn't read dependencies directory") {
-			let dependency = dependency?;
-			let path       = dependency.path();
-			let name       = dependency.file_name().into_string().expect("Invalid UTF-8");
-			let (name, url) = if let Ok(modid) = u64::from_str_radix(&name, 16) {
-				#[derive(Deserialize)]
-				struct ModInfo {
-					name: Box<str>
-				}
-
-				let mut buf = String::new();
-				File::open(path.join(".modinfo")).with_context(|_| format!("Couldn't read .modinfo file for {}", &name))?.read_to_string(&mut buf)?;
-				let modinfo: ModInfo = toml::from_str(&buf)?;
-
-				let url = format!("http://steamcommunity.com/sharedfiles/filedetails/?id={}", modid);
-
-				(modinfo.name, url.into_boxed_str())
-			} else if path.join(".git").exists() {
-				let repo   = Repository::open(path)?;
-				let origin = repo.find_remote("origin")?;
-				let url    = origin.url().unwrap();
-
-				(name.into_boxed_str(), String::from(url).into_boxed_str())
-			} else {
-				continue
-			};
-			s.push_str(&format!(
-				"  [*] [url={}]{}[/url]\n",
-				url,
-				name
-			));
-		};
-		s.push_str("[/list]\n\n");
-	};
-
-	Ok(s)
-}
 
 fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Utils) -> Result<steam::Item> {
 	ensure!(remote.file_write("laspad_mod.zip", &[0 as u8]).is_ok(), PublishError::DummyFile);
@@ -122,19 +49,8 @@ fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Ut
 pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	common::find_project()?;
 
-	let mut buf = String::new();
-	File::open("laspad.toml")?.read_to_string(&mut buf)?;
-
-	let toml: toml::Value = buf.parse()?;
-
-	let branch: Branch = if let toml::Value::Table(mut t) = toml {
-		match t.remove(branch_name) {
-			Some(b) => b,
-			None    => bail!(PublishError::NonexistentBranch { branch: branch_name.to_owned() }),
-		}.try_into().unwrap()
-	} else {
-		unreachable!()
-	};
+	let config = config::get()?;
+	ensure!(config.contains(branch_name), PublishError::NonexistentBranch { branch: branch_name.to_owned() });
 
 	let client     = steam::Client::new()?;
 	let mut remote = client.remote_storage()?;
@@ -150,6 +66,8 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		item
 	};
 
+	let branch = config.get(branch_name, item)?.unwrap();
+
 	update::main()?;
 
 	log!(1; "Zipping up files");
@@ -163,7 +81,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
 		zip.start_file(".modinfo", options)?;
-		zip.write_all(format!("name = \"{}\"", branch.name).as_bytes()).expect("Could not write to zip archive!");
+		zip.write_all(format!("name = \"{}\"", branch.name()?).as_bytes()).expect("Could not write to zip archive!");
 
 		compile::main()?;
 		for entry in WalkDir::new("compiled").follow_links(true) {
@@ -180,42 +98,26 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		zip.finish()?.into_inner()
 	};
 
-	log!(1; "Finished preparing preview and description");
-	let mut preview = fs::read(&*branch.preview).context("Could not read preview")?;
-	if preview.len() == 0 { // Steam craps itself when it has 0 length
-		preview.push(0);
-	};
-
-	let description = md_to_bb::convert(&fs::read_string(&*branch.description).context("Could not read description")?);
-
-	let description = if branch.autodescription {
-		let mut s = generate_description(item, branch.website.as_ref().map(|b| b.as_ref()))?;
-		s.push_str(&description);
-		s
-	} else {
-		description
-	};
-
 	log!(1; "Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
 		bail!(PublishError::CantUploadMod);
 	};
 
 	log!(1; "Uploading preview");
-	if remote.file_write("laspad_preview", &preview).is_err() {
+	if remote.file_write("laspad_preview", &branch.preview()?).is_err() {
 		bail!(PublishError::CantUploadPreview);
 	};
 
 	let mut request_update = || {
 		log!(1; "Requesting workshop item update");
 		let u = remote.update_workshop_file(item);
-		if u.title(&branch.name).is_err() {
+		if u.title(&branch.name()?).is_err() {
 			elog!("Could not update title");
 		};
-		if u.tags(&branch.tags.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
+		if u.tags(&branch.tags()?.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
 			elog!("Could not update tags");
 		};
-		if u.description(&description).is_err() {
+		if u.description(&branch.description()?).is_err() {
 			elog!("Could not update description");
 		};
 		if u.preview("laspad_preview").is_err() {
