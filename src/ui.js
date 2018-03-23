@@ -41,6 +41,7 @@ function get_msg(resp, callback) {
 	switch (resp.substring(0, 3)) {
 	case error:
 		set_active(false)
+		window.log(msg, "warning")
 		alert("Fatal error: " + msg)
 		return
 	case warning:
