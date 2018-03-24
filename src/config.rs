@@ -9,7 +9,7 @@ use std::{
 use git2::Repository;
 use failure::*;
 use toml;
-use rlua::{FromLua, prelude::*};
+use rlua::{FromLua, self, prelude::*};
 
 use steam;
 use md_to_bb;
@@ -29,7 +29,7 @@ struct TOMLBranch {
 enum ConfigKind {
 	// WARNING! Don't drop the Lua instance without dropping the table too!
 	// The table isn't static either actually
-	Lua(Lua, LuaTable<'static>),
+	Lua(Box<Lua>, LuaTable<'static>),
 	TOML(toml::value::Table),
 }
 enum BranchKind<'a> {
@@ -129,6 +129,12 @@ impl<'a> Branch<'a> {
 		}
 	}
 	pub fn preview(&self) -> Result<Vec<u8>> {
+		fn default(mut v: Vec<u8>) -> Vec<u8> {
+			if v.len() == 0 { // Steam craps itself when it has 0 length
+				v.extend_from_slice(b"\x89PNG\r\n\x1A\n"); // PNG header so that it shows an empty image in browsers instead of an error
+			};
+			v
+		}
 		match self.0 {
 			BranchKind::TOML(ref branch) => {
 				let mut preview = if let Some(preview) = branch.preview.as_ref() {
@@ -136,12 +142,9 @@ impl<'a> Branch<'a> {
 				} else {
 					Default::default()
 				};
-				if preview.len() == 0 { // Steam craps itself when it has 0 length
-					preview.extend_from_slice(b"\x89PNG\r\n\x1A\n"); // PNG header so that it shows an empty image in browsers instead of an error
-				};
-				Ok(preview)
+				Ok(default(preview))
 			},
-			BranchKind::Lua(ref lua, ref table) => Ok(get_value_lua(lua, table, "preview")?),
+			BranchKind::Lua(ref lua, ref table) => Ok(default(get_value_lua::<rlua::String>(lua, table, "preview")?.as_bytes().to_owned())),
 		}
 	}
 }
@@ -214,7 +217,7 @@ pub fn get() -> Result<Config> {
 	let lua  = Path::new("laspad.lua").exists();
 	ensure!(!lua || !toml, "You can not use both Lua *and* TOML configuration files!");
 	if lua {
-		let lua = Lua::new();
+		let lua = Box::new(Lua::new());
 		let table: LuaTable<'static> = {
 			let table: LuaTable = lua.exec(&fs::read_string("laspad.lua")?, Some("laspad.lua"))?;
 			unsafe {transmute(table)}
