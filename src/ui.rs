@@ -18,7 +18,7 @@ type Result<T> = ::std::result::Result<T, Error>;
 fn get_branches() -> Result<String> {
 	use std::slice::SliceConcatExt;
 
-	Ok(config::get()?.branches().as_slice().join(""))
+	Ok(config::get()?.branches()?.as_slice().join(""))
 }
 
 struct UI;
