@@ -1,6 +1,6 @@
 [package]
 name    = "laspad"
-version = "2.0.0-pre4"
+version = "2.0.0-pre5"
 authors = ["Las <las@protonmail.ch>"]
 license = "GPLv3"
 publish = false
