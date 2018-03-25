@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Encoding=UTF-8
+Name=laspad
+Comment=Publish mods for Natural Selection 2 to Steam Workshop
+Exec=laspad
+Icon=laspad
+Terminal=false
+StartupNotify=false
+Categories=NS2;Natural Selection 2;Steam;Workshop;Modification;
