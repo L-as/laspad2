@@ -33,12 +33,8 @@ struct UILog {
 impl UILog {
 	fn remove() -> String {
 		{
-			use std::ops::DerefMut;
-
 			let mut log             = logger::get();
-			let     log             = log.deref_mut().deref_mut();
-			let     log             = log.as_mut().unwrap();
-			let     log: &mut Log   = log.deref_mut();
+			let     log: &mut Log   = &mut **log.as_mut().unwrap();
 			let     log: &mut UILog = log.downcast_mut().unwrap();
 
 			log.queue.pop_front()
@@ -49,12 +45,8 @@ impl UILog {
 	}
 
 	fn push(s: String) {
-		use std::ops::DerefMut;
-
 		let mut log             = logger::get();
-		let     log             = log.deref_mut().deref_mut();
-		let     log             = log.as_mut().unwrap();
-		let     log: &mut Log   = log.deref_mut();
+		let     log: &mut Log   = &mut **log.as_mut().unwrap();
 		let     log: &mut UILog = log.downcast_mut().unwrap();
 
 		log.queue.push_back(s);
