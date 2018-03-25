@@ -78,6 +78,14 @@ function need() {
 	command("/need?" + prompt("Mod ID of dependency to add"))
 }
 
+function ns2() {
+	command("/ns2")
+}
+
+function editor() {
+	command("/editor")
+}
+
 function get_branches(resp) {
 	let branches = resp.split("")
 	for(let i = 0; i < branches.length; i++) {

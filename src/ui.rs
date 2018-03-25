@@ -11,6 +11,7 @@ use hyper::{self, server};
 use futures::future::{self, Future};
 
 use logger::{self, Log};
+use launch::Program;
 use config;
 
 type Result<T> = ::std::result::Result<T, Error>;
@@ -120,6 +121,8 @@ impl server::Service for UI {
 					("/update",         None)         => self.dispatch(::update::main),
 					("/publish",        Some(branch)) => {let branch = branch.to_owned(); self.dispatch(move || ::publish::main(&branch, false))},
 					("/need",           Some(modid))  => {let modid  = modid .to_owned(); self.dispatch(move || ::need::main(&modid))},
+					("/ns2",            None)         => self.dispatch(|| ::launch::main(None, Program::NS2)),
+					("/editor",         None)         => self.dispatch(|| ::launch::main(None, Program::Editor)),
 					("/get_branches",   None)         => self.run(get_branches),
 					("/get_msg",        None)         => UILog::remove(),
 					_                                 => {eprintln!("Invalid POST: {}, {:?}", command, query); String::from("ERRSomething went wrong, please retry")},
