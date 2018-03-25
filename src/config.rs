@@ -80,10 +80,10 @@ impl<'a> Config {
 	}
 }
 
-fn get_value_lua<'a, T: FromLua<'a>>(lua: &'a Lua, table: &LuaTable<'a>, key: &str) -> Result<T> {
+fn get_value_lua<'a, T: FromLua<'a>>(lua: &'a Lua, item: steam::Item, table: &LuaTable<'a>, key: &str) -> Result<T> {
 	let v = table.get(key)?;
 	match v {
-		LuaValue::Function(f) => Ok(f.call(())?),
+		LuaValue::Function(f) => Ok(f.call(item.0)?),
 		e => Ok(T::from_lua(e, lua)?),
 	}
 }
@@ -92,40 +92,23 @@ impl<'a> Branch<'a> {
 	pub fn name(&self) -> Result<Cow<str>> {
 		match self.0 {
 			BranchKind::TOML(ref branch)        => Ok(Cow::Borrowed(&branch.name)),
-			BranchKind::Lua(ref lua, ref table) => Ok(Cow::Owned(get_value_lua(lua, table, "name")?)),
+			BranchKind::Lua(ref lua, ref table) => Ok(Cow::Owned(get_value_lua(lua, self.1, table, "name")?)),
 		}
 	}
 	pub fn tags(&self) -> Result<Cow<[String]>> {
 		match self.0 {
 			BranchKind::TOML(ref branch)        => Ok(Cow::Borrowed(&branch.tags)),
-			BranchKind::Lua(ref lua, ref table) => Ok(Cow::Owned(get_value_lua(lua, table, "tags")?)),
+			BranchKind::Lua(ref lua, ref table) => Ok(Cow::Owned(get_value_lua(lua, self.1, table, "tags")?)),
 		}
 	}
 	pub fn description(&self) -> Result<String> {
 		match self.0 {
-			BranchKind::TOML(ref toml) => {
-				let description = if let Some(path) = toml.description.as_ref() {
-					let description = fs::read_string(path).context("Could not read description")?;
-					if Path::new(path).extension() == Some(OsStr::new("md")) {
-						md_to_bb::convert(&description)
-					} else {
-						description
-					}
-				} else {
-					Default::default()
-				};
-
-				let description = if toml.autodescription.unwrap_or(true) {
-					let mut s = generate_autodescription(self.1, toml.website.as_ref().map(|b| b.as_ref()))?;
-					s.push_str(&description);
-					s
-				} else {
-					description
-				};
-
-				Ok(description)
-			},
-			BranchKind::Lua(ref lua, ref table) => Ok(get_value_lua(lua, table, "description")?),
+			BranchKind::TOML(ref toml)           => read_description(
+				toml.description.as_ref().map(|s| s.as_ref()),
+				toml.autodescription.unwrap_or(false),
+				toml.website.as_ref().map(|s| s.as_ref()),
+				self.1),
+			BranchKind::Lua (ref lua, ref table) => Ok(get_value_lua(lua, self.1, table, "description")?),
 		}
 	}
 	pub fn preview(&self) -> Result<Vec<u8>> {
@@ -144,9 +127,33 @@ impl<'a> Branch<'a> {
 				};
 				Ok(default(preview))
 			},
-			BranchKind::Lua(ref lua, ref table) => Ok(default(get_value_lua::<rlua::String>(lua, table, "preview")?.as_bytes().to_owned())),
+			BranchKind::Lua(ref lua, ref table) => Ok(default(get_value_lua::<rlua::String>(lua, self.1, table, "preview")?.as_bytes().to_owned())),
 		}
 	}
+}
+
+fn read_description(path: Option<&Path>, auto_description: bool, website: Option<&str>, item: steam::Item) -> Result<String> {
+	let description = match path {
+		Some(path) => {
+			let description = fs::read_string(path).context("Could not read description")?;
+			if path.extension() == Some(OsStr::new("md")) {
+				md_to_bb::convert(&description)
+			} else {
+				description
+			}
+		},
+		None => Default::default(),
+	};
+
+	let description = if auto_description {
+		let mut s = generate_autodescription(item, website)?;
+		s.push_str(&description);
+		s
+	} else {
+		description
+	};
+
+	Ok(description)
 }
 
 fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<String> {
@@ -210,6 +217,36 @@ fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<
 	Ok(s)
 }
 
+fn lua_stdlib(lua: &Lua) -> Result<()> {
+	use std::sync::Arc;
+
+	let globals = lua.globals();
+	let stdlib = lua.create_table()?;
+
+	stdlib.set("get_description", lua.create_function(|lua, (path, auto_description, website): (String, Option<bool>, Option<String>)| {
+		lua.create_function(move |_, item: u64| {
+			let path = Path::new(&path);
+			let item = steam::Item(item);
+			read_description(Some(path), auto_description.unwrap_or(true), website.as_ref().map(|s| s.as_ref()), item).map_err(|e| {
+				LuaError::ExternalError(Arc::new(e))
+			})
+		})
+	})?)?;
+
+	stdlib.set("read", lua.create_function(|lua, path: String| {
+		lua.create_function(move |_, _item: u64| {
+			// Not actually valid UTF-8
+			// We just do this because otherwise rlua won't convert it to a lua string
+			fs::read(&path).map(|p| unsafe {String::from_utf8_unchecked(p)}).map_err(|e| {
+				LuaError::ExternalError(Arc::new(e.into()))
+			})
+		})
+	})?)?;
+
+	globals.set("laspad", stdlib)?;
+	Ok(())
+}
+
 pub fn get() -> Result<Config> {
 	use std::mem::transmute;
 
@@ -218,6 +255,7 @@ pub fn get() -> Result<Config> {
 	ensure!(!lua || !toml, "You can not use both Lua *and* TOML configuration files!");
 	if lua {
 		let lua = Box::new(Lua::new());
+		lua_stdlib(&lua)?;
 		let table: LuaTable<'static> = {
 			let table: LuaTable = lua.exec(&fs::read_string("laspad.lua")?, Some("laspad.lua"))?;
 			unsafe {transmute(table)}
