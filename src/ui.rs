@@ -5,6 +5,7 @@ use std::{
 	env,
 	fmt::Display,
 	process::exit,
+	collections::VecDeque,
 };
 use failure::*;
 use hyper::{self, server};
@@ -26,7 +27,7 @@ struct UI;
 
 struct UILog {
 	sublog: Option<Box<Log>>,
-	queue:  Vec<String>,
+	queue:  VecDeque<String>,
 }
 
 impl UILog {
@@ -40,11 +41,7 @@ impl UILog {
 			let     log: &mut Log   = log.deref_mut();
 			let     log: &mut UILog = log.downcast_mut().unwrap();
 
-			if log.queue.len() > 0 {
-				Some(log.queue.remove(0))
-			} else {
-				None
-			}
+			log.queue.pop_front()
 		}.unwrap_or({
 			thread::sleep(time::Duration::from_millis(100));
 			String::new()
@@ -60,14 +57,14 @@ impl UILog {
 		let     log: &mut Log   = log.deref_mut();
 		let     log: &mut UILog = log.downcast_mut().unwrap();
 
-		log.queue.push(s);
+		log.queue.push_back(s);
 	}
 }
 
 impl Log for UILog {
 	fn write(&mut self, p: i64, line: &str) {
 		let str = format!("{}{}", if p > 0 {"WRN"} else if p == 0 {"INF"} else {"LOG"}, line);
-		self.queue.push(str);
+		self.queue.push_back(str);
 		if let Some(ref mut sublog) = self.sublog {
 			sublog.write(p, line);
 		};
@@ -148,7 +145,7 @@ pub fn main() -> Result<()> {
 		let server = server::Http::new().bind(&addr, move || Ok(UI))?;
 		let log = UILog {
 			sublog: logger::remove(),
-			queue:  Vec::new(),
+			queue:  VecDeque::new(),
 		};
 		logger::set(Box::new(log));
 		server.run()?;
