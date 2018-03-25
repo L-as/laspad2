@@ -16,6 +16,7 @@ echo Set oWS = WScript.CreateObject("WScript.Shell") >> %SCRIPT%
 echo sLinkFile = "%USERPROFILE%\Desktop\laspad.lnk" >> %SCRIPT%
 echo Set oLink = oWS.CreateShortcut(sLinkFile) >> %SCRIPT%
 echo oLink.TargetPath = "%HOMEPATH%\.cargo\bin\laspad-gui.exe" >> %SCRIPT%
+echo oLink.IconLocation = "%CD%/icon.png, 0"
 echo oLink.Save >> %SCRIPT%
 
 cscript /nologo %SCRIPT%
