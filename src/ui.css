@@ -6,61 +6,74 @@ html, body {
 }
 
 body {
-	background-color: #2F2F2F;
+	background-color: #333;
 	display:          flex;
-}
-
-.command {
-	border:     none;
-	text-align: center;
-	font-size:  3rem;
-	margin:     0.8vmin;
-	height:     100%;
-	color:      #2F2F2F;
-}
-
-.branch {
-	margin:     0.8vmin;
-	height:     100%;
-	width:      100%;
-	text-align: center;
-	border:     none;
-	font-size:  2rem;
-	background: #70433A;
-	color:      #2F2F2F;
 }
 
 #commandpanel {
 	display:        flex;
 	flex-direction: column;
-	align-items:    stretch;
 	flex:           1;
+	margin:         0.5vmin;
+}
+
+#subcommands {
+	display:        flex;
+	flex-direction: row;
+	flex-wrap:      wrap;
+	flex:           2;
+	align-items:    stretch;
+}
+
+#subcommands>button {
+	flex: 1 0 0;
+	font-size:  2rem;
 }
 
 #publish {
 	display:        flex;
-	margin:         none;
-	border:         none;
-	height:         100%;
-	margin-bottom:  1.6vmin;
 	flex-direction: row;
+	flex:           1;
+}
+
+.branch {
+	flex:       1 0 0;
+	font-size:  2rem;
+	background: #70433A;
+}
+
+button {
+	margin: 0.8vmin;
+	border: none;
+}
+
+button:hover {
+	background: #555 !important;
 }
 
 #update {
-	background: #30933A;
+	background: #757;
 }
 
 #need {
-	background: #CC0;
+	background: #775;
 }
 
+#ns2 {
+	background: #577;
+}
+
+#editor {
+	background: #C77;
+}
+
+
 #log {
-	font-size: 1.3rem;
-	overflow:  auto;
-	margin:    0.8vmin;
-	padding:   1em;
-	flex:      1;
-	color:     white;
+	overflow:     auto;
+	flex:         1;
+	font-size:    1.3rem;
+	margin-top:   0.5vmin;
+	margin-right: 0.5vmin;
 }
 
 .warning {

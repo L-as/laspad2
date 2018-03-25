@@ -8,9 +8,13 @@
 </head>
 <body>
 	<div id="commandpanel">
-		<div                                                      id="publish"></div>
-		<button type="button" onclick="update()"  class="command" id="update"> Update            </button>
-		<button type="button" onclick="need()"    class="command" id="need">   Add new dependency</button>
+		<div id="publish"></div>
+		<div id="subcommands">
+			<button type="button" onclick="update()" id="update"> Update dependencies</button>
+			<button type="button" onclick="need()"   id="need">   Add new dependency</button>
+			<button type="button" onclick="ns2()"    id="ns2">    Launch NS2</button>
+			<button type="button" onclick="editor()" id="editor"> Launch Editor</button>
+		</div>
 	</div>
 	<div id=log>LASPAD LOG:</div>
 	<script>{javascript}</script>
