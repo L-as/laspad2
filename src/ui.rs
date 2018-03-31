@@ -145,7 +145,7 @@ pub fn main() -> Result<()> {
 	}
 	thread::spawn(move || if let Err(e) = spawn_server() {eprintln!("Server failed: {}", e); exit(1)});
 
-	let (_, success) = web_view::run("laspad", "", Some((1600, 900)), true, true, move |webview| {
+	let (_, success) = web_view::run("laspad", "", Some((1280, 720)), true, true, move |webview| {
 		use web_view::*;
 
 		thread::spawn(move || {
