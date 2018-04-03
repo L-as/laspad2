@@ -1,5 +1,4 @@
 #![feature(extern_types)]
-#![feature(fs_read_write)]
 #![feature(slice_concat_ext)]
 
 #![allow(safe_packed_borrows)]

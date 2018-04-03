@@ -135,7 +135,7 @@ impl<'a> Branch<'a> {
 fn read_description(path: Option<&Path>, auto_description: bool, website: Option<&str>, item: steam::Item) -> Result<String> {
 	let description = match path {
 		Some(path) => {
-			let description = fs::read_string(path).context("Could not read description")?;
+			let description = fs::read_to_string(path).context("Could not read description")?;
 			if path.extension() == Some(OsStr::new("md")) {
 				md_to_bb::convert(&description)
 			} else {
@@ -190,7 +190,7 @@ fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<
 					name: Box<str>
 				}
 
-				let s = fs::read_string(path.join(".modinfo")).with_context(|_| format!("Couldn't read .modinfo file for {}", &name))?;
+				let s = fs::read_to_string(path.join(".modinfo")).with_context(|_| format!("Couldn't read .modinfo file for {}", &name))?;
 				let modinfo: ModInfo = toml::from_str(&s)?;
 
 				let url = format!("http://steamcommunity.com/sharedfiles/filedetails/?id={}", modid);
@@ -257,12 +257,12 @@ pub fn get() -> Result<Config> {
 		let lua = Box::new(Lua::new());
 		lua_stdlib(&lua)?;
 		let table: LuaTable<'static> = {
-			let table: LuaTable = lua.exec(&fs::read_string("laspad.lua")?, Some("laspad.lua"))?;
+			let table: LuaTable = lua.exec(&fs::read_to_string("laspad.lua")?, Some("laspad.lua"))?;
 			unsafe {transmute(table)}
 		};
 		Ok(Config(ConfigKind::Lua(lua, table)))
 	} else if toml {
-		let toml: toml::Value = fs::read_string("laspad.toml")?.parse()?;
+		let toml: toml::Value = fs::read_to_string("laspad.toml")?.parse()?;
 		let toml = if let toml::Value::Table(t) = toml {
 			t
 		} else {

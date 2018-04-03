@@ -58,7 +58,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
-		steam::Item(u64::from_str_radix(&fs::read_string(&modid_file).context("Could not read the modid file")?, 16)?)
+		steam::Item(u64::from_str_radix(&fs::read_to_string(&modid_file).context("Could not read the modid file")?, 16)?)
 	} else {
 		let item = create_workshop_item(&mut remote, &mut utils)?;
 		log!(1; "Created Mod ID: {:X}", item.0);
