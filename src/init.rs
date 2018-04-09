@@ -14,7 +14,7 @@ enum InitError {
 type Result = ::std::result::Result<(), Error>;
 
 pub fn main(lua: bool) -> Result {
-	ensure!(common::is_laspad_project("."), InitError::AlreadyExists);
+	ensure!(!common::is_laspad_project("."), InitError::AlreadyExists);
 
 	if lua {
 		File::create("laspad.lua")?.write_all(include_bytes!("../laspad.lua"))?;
