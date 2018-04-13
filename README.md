@@ -2,8 +2,8 @@
 This is a tool for publishing mods/maps for Natural Selection 2 to the Steam Workshop.
 
 Features:
-* CLI
-* GUI
+* Works on Windows *and* Linux
+* both CLI and GUI
 * Can bundle multiple mods together
 * Can download mods from workshop into a local folder
 * Can launch NS2/Editor with the current project
