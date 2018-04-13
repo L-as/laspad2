@@ -1,6 +1,7 @@
 laspad
 laspad.tar.gz
 laspad.7z
+laspad.AppImage
 *.exe
 *.o
 *.obj
