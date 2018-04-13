@@ -176,5 +176,6 @@ lazy_static! {
 		include_str!("ui.html"),
 		stylesheet = include_str!("ui.css"),
 		javascript = include_str!("ui.js"),
+		version    = crate_version!(),
 	);
 }
