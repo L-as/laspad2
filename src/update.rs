@@ -59,7 +59,7 @@ pub fn specific<P: AsRef<Path>>(item: Item, path: P) -> Result<()> {
 	let format: NS2XMLFormat = serde_xml_rs::deserialize(&*download(&format!(
 		"http://mods.ns2cdt.com/ISteamRemoteStorage/GetPublishedFileDetails/V0001?format=xml&publishedfileid={}",
 		item.0
-	))?).with_context(|_| format!("Could not deserialize XML from Steam for {}", item))?;
+	))?).with_context(|_| format!("Could not deserialize XML from Steam for {:X}", item.0))?;
 
 	let local_update = {
 		let path = path.join(".update_timestamp");
@@ -72,7 +72,7 @@ pub fn specific<P: AsRef<Path>>(item: Item, path: P) -> Result<()> {
 
 	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
 	if local_update < remote_update {
-		log!(1; "Local workshop item {} copy is outdated, {} < {}", item, local_update, remote_update);
+		log!(1; "Local workshop item {:8X} copy is outdated, {} < {}", item.0, local_update, remote_update);
 		for entry in fs::read_dir(path)? {
 			let entry = &entry?.path();
 			if entry.file_name().unwrap().to_str().unwrap().chars().next().unwrap() != '.' {
@@ -86,9 +86,9 @@ pub fn specific<P: AsRef<Path>>(item: Item, path: P) -> Result<()> {
 
 		let url = &format.publishedfiledetails.publishedfile.file_url;
 		let buf = download(url)?;
-		let mut archive = ZipArchive::new(Cursor::new(buf)).with_context(|_| format!("Could not read zip archive for {} @ {}", item, url))?;
+		let mut archive = ZipArchive::new(Cursor::new(buf)).with_context(|_| format!("Could not read zip archive for {:X} @ {}", item.0, url))?;
 		for i in 0..archive.len() {
-			let mut file = archive.by_index(i).with_context(|_| format!("Could not access file in zip archive for {}", item))?;
+			let mut file = archive.by_index(i).with_context(|_| format!("Could not access file in zip archive for {:X}", item.0))?;
 			let path = path.join(file.name());
 			fs::create_dir_all(path.parent().unwrap())?;
 			let mut buf = Vec::new();
@@ -97,7 +97,7 @@ pub fn specific<P: AsRef<Path>>(item: Item, path: P) -> Result<()> {
 		};
 		File::create(path.join(".update_timestamp"))?.write_u64::<LE>(remote_update)?;
 	} else {
-		log!(1; "Local workshop item {} copy is up-to-date", item);
+		log!(1; "Local workshop item {:8X} copy is up-to-date", item.0);
 	};
 
 	Ok(())
@@ -113,7 +113,7 @@ pub fn main() -> Result<()> {
 			let path = &dep?.path();
 			if let Ok(modid) = u64::from_str_radix(path.file_name().unwrap().to_str().unwrap(), 16) {
 				if let Err(e) = specific(Item(modid), path) {
-					elog!("Could not update {}: {}", Item(modid), e);
+					elog!("Could not update {:X}: {}", modid, e);
 				};
 			};
 		};

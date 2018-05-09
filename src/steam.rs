@@ -13,12 +13,6 @@ include!("steam_ffi.rs");
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Item(pub u64);
 
-impl fmt::Display for Item {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{:8X}", self.0)
-	}
-}
-
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct APICall(u64);

@@ -63,6 +63,7 @@ impl<'a> Config {
 		}
 	}
 	pub fn get(&'a self, key: &str, item: steam::Item) -> Result<Option<Branch<'a>>> {
+		log!(2; "Accessed branch {}", key);
 		match self.0 {
 			ConfigKind::TOML(ref table) => {
 				let v: TOMLBranch = if let Some(v) = table.get(key) {
@@ -158,8 +159,8 @@ fn read_description(path: Option<&Path>, auto_description: bool, website: Option
 
 fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<String> {
 	let mut s: String = format!(
-		"[b]Mod ID: {}[/b]\n\n",
-		item
+		"[b]Mod ID: {:X}[/b]\n\n",
+		item.0
 	);
 
 	if Path::new(".git").exists() && website.is_some() {
@@ -254,6 +255,7 @@ pub fn get() -> Result<Config> {
 	let lua  = Path::new("laspad.lua").exists();
 	ensure!(!lua || !toml, "You can not use both Lua *and* TOML configuration files!");
 	if lua {
+		log!(2; "Reading laspad.lua");
 		let lua = Box::new(Lua::new());
 		lua_stdlib(&lua)?;
 		let table: LuaTable<'static> = {
@@ -262,6 +264,7 @@ pub fn get() -> Result<Config> {
 		};
 		Ok(Config(ConfigKind::Lua(lua, table)))
 	} else if toml {
+		log!(2; "Reading laspad.toml");
 		let toml: toml::Value = fs::read_to_string("laspad.toml")?.parse()?;
 		let toml = if let toml::Value::Table(t) = toml {
 			t

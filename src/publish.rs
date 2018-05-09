@@ -52,10 +52,14 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	let config = config::get()?;
 	ensure!(config.contains(branch_name), PublishError::NonexistentBranch { branch: branch_name.to_owned() });
 
+	log!(2; "Connecting to steam process");
 	let client     = steam::Client::new()?;
+	log!(2; "Accessing Remote Storage API");
 	let mut remote = client.remote_storage()?;
+	log!(2; "Accessing Utils API");
 	let mut utils  = client.utils()?;
 
+	log!(2; "Finding mod id for branch");
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
 		steam::Item(u64::from_str_radix(&fs::read_to_string(&modid_file).context("Could not read the modid file")?, 16)?)
@@ -65,6 +69,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
+	log!(2; "Mod ID: {:X}", item.0);
 
 	let branch = config.get(branch_name, item)?.unwrap();
 
@@ -140,7 +145,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 
 		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item));
 		if let Ok(item) = result {
-			log!("Published mod: {}", item);
+			log!("Published mod: {:X}", item.0);
 		};
 
 		Ok(result?)
