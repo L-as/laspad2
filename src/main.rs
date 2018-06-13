@@ -1,15 +1,13 @@
 #![feature(extern_types)]
+#![feature(repr_transparent)]
 #![feature(slice_concat_ext)]
 
-#![allow(safe_packed_borrows)]
 #![deny(unused_must_use)]
 
 #![windows_subsystem = "windows"]
 
 #[macro_use]
 extern crate clap;
-#[macro_use]
-extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -18,13 +16,12 @@ extern crate failure;
 extern crate downcast;
 #[macro_use]
 extern crate command_macros;
+#[macro_use]
+extern crate serde_derive;
 
 extern crate toml;
-extern crate serde;
 extern crate serde_xml_rs;
 extern crate byteorder;
-extern crate zip;
-extern crate curl;
 extern crate regex;
 extern crate git2;
 extern crate web_view;
@@ -33,8 +30,9 @@ extern crate futures;
 extern crate hyper;
 extern crate mime;
 extern crate walkdir;
-extern crate mktemp;
+extern crate tempfile;
 extern crate rlua;
+extern crate serde;
 //extern crate steamy_vdf as vdf;
 
 #[macro_use]
@@ -49,8 +47,6 @@ mod config;
 
 // console commands
 mod init;
-mod need;
-mod update;
 mod compile;
 mod publish;
 mod launch;
@@ -108,17 +104,10 @@ Set this to generate a laspad project that uses a Lua configuration file instead
 Using Lua for configuration files allows you to customize the project much more,
 including custom build rules.")
 		)
-		(@subcommand need =>
-			(about: "Makes workshop item dependency")
-			(@arg MODID: +required "Hexadecimal ID of workshop item")
-		)
-		(@subcommand update =>
-			(about: "Updates dependencies\nNB: `publish` automatically runs `update`")
-		)
 		(@subcommand download =>
 			(about: "Download and extract mod from workshop into target folder")
-			(@arg MODID: +required "Hexadecimal ID of workshop item")
-			(@arg PATH:  +required "Where to extract it")
+			(@arg MODID: +required "ID of workshop item")
+			(@arg PATH:  +required "Where to place it")
 		)
 		(@subcommand compile =>
 			(about: "\
@@ -173,20 +162,11 @@ fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Er
 	match matches.subcommand() {
 		("",         None)    =>      ui::main(),
 		("init",     Some(m)) =>    init::main(m.is_present("LUA")),
-		("need",     Some(m)) =>    need::main(m.value_of("MODID").unwrap()),
-		("update",   Some(_)) =>  update::main(),
 		("compile",  Some(_)) => compile::main(),
 		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY")),
 		("launch",   Some(m)) =>  launch::main(m.value_of("NS2ROOT"), launch::Program::from_str(m.subcommand_name().unwrap())?),
 		("prepare",  Some(m)) => prepare::main(m.value_of("NS2ROOT")).map(|_| ()),
-		("download", Some(m)) => {
-			use std::fs;
-
-			let path = m.value_of("PATH").unwrap();
-			fs::create_dir_all(path)?;
-			let modid = u64::from_str_radix(&m.value_of("MODID").unwrap().to_uppercase(), 16)?;
-			update::specific(steam::Item(modid), m.value_of("PATH").unwrap())
-		},
+		("download", Some(_m)) => {unimplemented!()},
 		_ => {
 			unreachable!();
 		},

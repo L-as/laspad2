@@ -2,18 +2,24 @@
 
 use std::ffi::CString;
 use std::mem::{forget, size_of, transmute, zeroed};
-use std::error;
 use std::fmt;
+use std::ptr;
+use std::path::Path;
 
 use failure::*;
 
 include!("steam_ffi.rs");
 
-#[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(transparent)]
 pub struct Item(pub u64);
 
-#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+#[repr(transparent)]
+pub struct AppID(pub u32);
+
+
+#[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct APICall(u64);
 
@@ -32,32 +38,47 @@ pub trait APICallResult {
 }
 
 #[repr(packed)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PublishItemResult {
-	pub result:           SteamResult,
-	pub item:             Item,
-	    accept_agreement: bool,
+pub struct CreateItemResult {
+	pub result: SteamResult,
+	pub item:   Item,
+	/// This is true if the user needs to agree to the legal agreement.
+	/// This is doable on the steam workshop's web interface.
+	pub legal_agreement_required: bool,
 }
 
-impl APICallResult for PublishItemResult {
-	const CALLBACK_ID: u32 = 1309;
+impl APICallResult for CreateItemResult {
+	const CALLBACK_ID: u32 = 3403;
 }
 
 #[repr(packed)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UpdateItemResult {
-	pub result:           SteamResult,
-	pub item:             Item,
-	    accept_agreement: bool,
+pub struct DownloadItemResult {
+	pub app_id: AppID,
+	pub item:   Item,
+	pub result: SteamResult,
 }
 
-impl APICallResult for UpdateItemResult {
-	const CALLBACK_ID: u32 = 1316;
+impl APICallResult for DownloadItemResult {
+	const CALLBACK_ID: u32 = 3406;
 }
+
+#[repr(packed)]
+pub struct SubmitItemUpdateResult {
+	pub result: SteamResult,
+	/// Look in CreateItemResult
+	pub legal_agreement_required: bool,
+	pub item: Item,
+}
+
+impl APICallResult for SubmitItemUpdateResult {
+	const CALLBACK_ID: u32 = 3404;
+}
+
+#[derive(Clone)]
+pub struct UGC(*mut UGCImpl);
 
 pub struct ItemUpdater<'a> {
 	handle: UpdateHandle,
-	storage: &'a RemoteStorage
+	ugc: &'a UGC
 }
 
 impl<'a> ItemUpdater<'a> {
@@ -69,99 +90,68 @@ impl<'a> ItemUpdater<'a> {
 			ptr
 		}).collect();
 		let tags = Strings {
-			elements: tags.as_slice().as_ptr() as *const *const i8,
-			length: tags.len() as i32,
+			strings: tags.as_slice().as_ptr() as *const *const i8,
+			count: tags.len() as i32,
 		};
 
-		if unsafe { SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTags(self.storage.0, self.handle, &tags as *const Strings) } {
+		if unsafe { SteamAPI_ISteamUGC_SetItemTags(self.ugc.0, self.handle, &tags as *const Strings) } {
 			Ok(&self)
 		} else {
 			Err(())
 		}
 	}
-	pub fn contents(&self, contents_path: &str) -> Result<&Self, ()> {
-		if unsafe { SteamAPI_ISteamRemoteStorage_UpdatePublishedFileFile(self.storage.0, self.handle, CString::new(contents_path).unwrap().as_ptr()) } {
+	pub fn content(&self, content_path: &Path) -> Result<&Self, ()> {
+		if unsafe { SteamAPI_ISteamUGC_SetItemContent(self.ugc.0, self.handle, CString::new(content_path.to_str().unwrap()).unwrap().as_ptr()) } {
 			Ok(&self)
 		} else {
 			Err(())
 		}
 	}
-	pub fn preview(&self, preview_path: &str) -> Result<&Self, ()> {
-		if unsafe { SteamAPI_ISteamRemoteStorage_UpdatePublishedFilePreviewFile(self.storage.0, self.handle, CString::new(preview_path).unwrap().as_ptr()) } {
+	pub fn preview(&self, preview_path: &Path) -> Result<&Self, ()> {
+		if unsafe { SteamAPI_ISteamUGC_SetItemPreview(self.ugc.0, self.handle, CString::new(preview_path.to_str().unwrap()).unwrap().as_ptr()) } {
 			Ok(&self)
 		} else {
 			Err(())
 		}
 	}
 	pub fn description(&self, description: &str) -> Result<&Self, ()> {
-		if unsafe { SteamAPI_ISteamRemoteStorage_UpdatePublishedFileDescription(self.storage.0, self.handle, CString::new(description).unwrap().as_ptr()) } {
+		if unsafe { SteamAPI_ISteamUGC_SetItemDescription(self.ugc.0, self.handle, CString::new(description).unwrap().as_ptr()) } {
 			Ok(&self)
 		} else {
 			Err(())
 		}
 	}
 	pub fn title(&self, title: &str) -> Result<&Self, ()> {
-		if unsafe { SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTitle(self.storage.0, self.handle, CString::new(title).unwrap().as_ptr()) } {
+		if unsafe { SteamAPI_ISteamUGC_SetItemTitle(self.ugc.0, self.handle, CString::new(title).unwrap().as_ptr()) } {
 			Ok(&self)
 		} else {
 			Err(())
 		}
 	}
-	pub fn change_description(&self, change_description: &str) -> Result<&Self, ()> {
-		if unsafe { SteamAPI_ISteamRemoteStorage_UpdatePublishedFileSetChangeDescription(self.storage.0, self.handle, CString::new(change_description).unwrap().as_ptr()) } {
-			Ok(&self)
-		} else {
-			Err(())
-		}
-	}
-	pub fn commit(&self) -> APICall {
-		unsafe { SteamAPI_ISteamRemoteStorage_CommitPublishedFileUpdate(self.storage.0, self.handle) }
+	pub fn submit(&self, update_note: Option<&str>) -> APICall {
+		let ptr = update_note.map(|s| {let s = CString::new(s).unwrap(); let ptr = s.as_ptr(); forget(s); ptr}).unwrap_or(ptr::null());
+		unsafe { SteamAPI_ISteamUGC_SubmitItemUpdate(self.ugc.0, self.handle, ptr) }
 	}
 }
 
-pub struct RemoteStorage(*mut RemoteStorageImpl);
-
-impl RemoteStorage {
-	pub fn file_write(&mut self, name: &str, data: &[u8]) -> Result<(), ()> {
-		if unsafe {SteamAPI_ISteamRemoteStorage_FileWrite(
+impl UGC {
+	pub fn create_item(&mut self) -> APICall {
+		unsafe {SteamAPI_ISteamUGC_CreateItem(
 			self.0,
-			CString::new(name).unwrap().as_ptr(),
-			data.as_ptr(),
-			data.len() as u32
-		)} {
-			Ok(())
-		} else {
-			Err(())
-		}
-	}
-
-	pub fn publish_workshop_file(&mut self, contents_path: &str, preview_path: &str, title: &str, description: &str, tags: &[&str]) -> APICall {
-		let tags = Strings {
-			elements: tags.iter().map(|&s| CString::new(s).unwrap().as_ptr()).collect::<Vec<_>>().as_ptr(),
-			length: tags.len() as i32,
-		};
-
-		unsafe {SteamAPI_ISteamRemoteStorage_PublishWorkshopFile(
-			self.0,
-			CString::new(contents_path).unwrap().as_ptr(),
-			CString::new(preview_path).unwrap().as_ptr(),
-			4920,
-			CString::new(title).unwrap().as_ptr(),
-			CString::new(description).unwrap().as_ptr(),
-			Visibility::Public,
-			&tags as *const Strings,
+			DepotID(4920),
 			FileType::Community
 		)}
 	}
 
-	pub fn update_workshop_file<'a>(&'a mut self, item: Item) -> ItemUpdater<'a> {
+	pub fn update_item<'a>(&'a mut self, app_id: AppID, item: Item) -> ItemUpdater<'a> {
 		ItemUpdater {
-			handle: unsafe { SteamAPI_ISteamRemoteStorage_CreatePublishedFileUpdateRequest(self.0, item) },
-			storage: self,
+			handle: unsafe { SteamAPI_ISteamUGC_StartItemUpdate(self.0, app_id, item) },
+			ugc: self,
 		}
 	}
 }
 
+#[derive(Clone)]
 pub struct Utils(*mut UtilsImpl);
 
 impl Utils {
@@ -170,7 +160,7 @@ impl Utils {
 		unsafe { SteamAPI_ISteamUtils_IsAPICallCompleted(self.0, call, &mut b as *mut bool) }
 	}
 
-	pub fn get_apicall_result<T: APICallResult + fmt::Debug>(&self, call: APICall) -> T {
+	pub fn get_apicall_result<T: APICallResult>(&self, call: APICall) -> T {
 		while !self.is_apicall_completed(call) {
 			use std::{thread, time::Duration};
 			thread::sleep(Duration::from_millis(200));
@@ -192,30 +182,35 @@ impl Utils {
 	}
 }
 
+#[derive(Clone)]
 pub struct Client(*mut ClientImpl);
+
+static STEAM_CLIENT_VERSION: &'static [u8] = b"SteamClient017\0";
+static STEAM_UGC_VERSION:    &'static [u8] = b"STEAMUGC_INTERFACE_VERSION010\0";
+static STEAM_UTILS_VERSION:  &'static [u8] = b"SteamUtils009\0";
 
 impl Client {
 	pub fn new() -> Result<Self, Error> {
 		ensure!(unsafe {SteamAPI_Init()}, "Could not initialize SteamAPI");
 
-		let client: *mut ClientImpl = unsafe { transmute(SteamInternal_CreateInterface(CString::new("SteamClient017").unwrap().as_ptr())) };
+		let client: *mut ClientImpl = unsafe { transmute(SteamInternal_CreateInterface(STEAM_CLIENT_VERSION.as_ptr() as _)) };
 
 		Ok(Client(client))
 	}
 
-	pub fn remote_storage(&self) -> Result<RemoteStorage, Error> {
-		let user    = unsafe {SteamAPI_GetHSteamUser()};
-		let pipe    = unsafe {SteamAPI_GetHSteamPipe()};
-		let storage = unsafe {SteamAPI_ISteamClient_GetISteamRemoteStorage(self.0, user, pipe, CString::new("STEAMREMOTESTORAGE_INTERFACE_VERSION014").unwrap().as_ptr())};
+	pub fn ugc(&self) -> Result<UGC, Error> {
+		let user = unsafe {SteamAPI_GetHSteamUser()};
+		let pipe = unsafe {SteamAPI_GetHSteamPipe()};
+		let ugc  = unsafe {SteamAPI_ISteamClient_GetISteamUGC(self.0, user, pipe, STEAM_UGC_VERSION.as_ptr() as _)};
 
-		ensure!(!storage.is_null(), "Could not retrive steam's remote storage API");
+		ensure!(!ugc.is_null(), "Could not retrive steam's user generated content API");
 
-		Ok(RemoteStorage(storage))
+		Ok(UGC(ugc))
 	}
 
 	pub fn utils(&self) -> Result<Utils, Error> {
-		let pipe    = unsafe {SteamAPI_GetHSteamPipe()};
-		let utils = unsafe {SteamAPI_ISteamClient_GetISteamUtils(self.0, pipe, CString::new("SteamUtils009").unwrap().as_ptr())};
+		let pipe  = unsafe {SteamAPI_GetHSteamPipe()};
+		let utils = unsafe {SteamAPI_ISteamClient_GetISteamUtils(self.0, pipe, STEAM_UTILS_VERSION.as_ptr() as _)};
 
 		ensure!(!utils.is_null(), "Could not retrive steam's utils API");
 

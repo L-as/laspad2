@@ -5,7 +5,7 @@ use std::{
 };
 use failure::*;
 use walkdir::WalkDir;
-use mktemp::Temp;
+use tempfile::tempdir;
 
 use common;
 use builder::Builder;
@@ -108,13 +108,13 @@ pub fn main() -> Result {
 	// copied over from the old directory. If not, the old one will simply
 	// disappear at the end of this scope.
 	let old = if dst.exists() {
-		let dir = Temp::new_in(".");
+		let dir = tempdir()?;
 		fs::rename(dst, &dir).unwrap();
 		Some(dir)
 	} else {None};
 	fs::create_dir(dst)?;
 
-	let mut builder = Builder::new(dst.to_path_buf(), old.map(|o| o.to_path_buf()));
+	let mut builder = Builder::new(dst.to_path_buf(), old.map(|o| o.path().to_owned()));
 
 	iterate_files(&Path::new("."), &mut |root, path| {
 		let dst = &dst.join(path);

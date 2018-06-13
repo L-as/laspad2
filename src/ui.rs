@@ -107,9 +107,7 @@ impl server::Service for UI {
 				let body = match (command, query) {
 					("/exit",           None)         => exit(0),
 					("/create_project", None)         => self.dispatch(|| ::init::main(false)),
-					("/update",         None)         => self.dispatch(::update::main),
 					("/publish",        Some(branch)) => {let branch = branch.to_owned(); self.dispatch(move || ::publish::main(&branch, false))},
-					("/need",           Some(modid))  => {let modid  = modid .to_owned(); self.dispatch(move || ::need::main(&modid))},
 					("/ns2",            None)         => self.dispatch(|| ::launch::main(None, Program::NS2)),
 					("/editor",         None)         => self.dispatch(|| ::launch::main(None, Program::Editor)),
 					("/get_branches",   None)         => self.run(get_branches),

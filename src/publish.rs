@@ -1,50 +1,27 @@
 use std::path::{Path, PathBuf};
 use std::fs;
-use std::io::{Write, Cursor};
-use std::result::Result as StdResult;
+use std::io::Write;
+use std::result;
 use failure::*;
-use zip;
 use git2::Repository;
+use tempfile::NamedTempFile;
 
-use steam::{GeneralError as SteamError, self};
-use update;
+use steam::{GeneralError as SteamError, *, self};
 use compile;
 use common;
 use config;
 
 #[derive(Debug, Fail)]
 pub enum PublishError {
-	#[fail(display = "Could not publish dummy file to steam")]
-	DummyFile,
 	#[fail(display = "Branch {} does not exist", branch)]
 	NonexistentBranch {
 		branch: String
 	},
-	#[fail(display = "Could not upload zip file to remote storage")]
-	CantUploadMod,
-	#[fail(display = "Could not upload preview to remote storage")]
-	CantUploadPreview,
-	#[fail(display = "Could not update zip file used")]
+	#[fail(display = "Could not update the contents of the workshop item")]
 	CantUpdateMod,
 }
 
 type Result<T> = ::std::result::Result<T, Error>;
-
-fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Utils) -> Result<steam::Item> {
-	ensure!(remote.file_write("laspad_mod.zip", &[0 as u8]).is_ok(), PublishError::DummyFile);
-
-	let apicall = remote.publish_workshop_file(
-		"laspad_mod.zip",
-		"laspad_mod.zip",
-		"dummy",
-		"dummy",
-		&[]
-	);
-
-	let result = utils.get_apicall_result::<steam::PublishItemResult>(apicall);
-
-	Ok(StdResult::<_, _>::from(result.result).and(Ok(result.item))?)
-}
 
 pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	common::find_project()?;
@@ -53,69 +30,35 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	ensure!(config.contains(branch_name), PublishError::NonexistentBranch { branch: branch_name.to_owned() });
 
 	log!(2; "Connecting to steam process");
-	let client     = steam::Client::new()?;
-	log!(2; "Accessing Remote Storage API");
-	let mut remote = client.remote_storage()?;
+	let client = steam::Client::new()?;
+	log!(2; "Accessing UGC API");
+	let mut ugc = client.ugc()?;
 	log!(2; "Accessing Utils API");
-	let mut utils  = client.utils()?;
+	let utils = client.utils()?;
 
 	log!(2; "Finding mod id for branch");
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
 		steam::Item(u64::from_str_radix(&fs::read_to_string(&modid_file).context("Could not read the modid file")?, 16)?)
 	} else {
-		let item = create_workshop_item(&mut remote, &mut utils)?;
+		let apicall = ugc.create_item();
+		let result: steam::CreateItemResult = utils.get_apicall_result(apicall);
+		result::Result::from(result.result)?;
+		ensure!(!result.legal_agreement_required, "You need to accept the workshop legal agreement on https://steamcommunity.com/app/4920/workshop/");
+		let item = result.item;
 		log!(1; "Created Mod ID: {:X}", item.0);
 		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
 	log!(2; "Mod ID: {:X}", item.0);
 
+	compile::main()?;
+
 	let branch = config.get(branch_name, item)?.unwrap();
-
-	update::main()?;
-
-	log!(1; "Zipping up files");
-	let zip = Vec::new();
-	let zip = {
-		use walkdir::WalkDir;
-
-		let mut cursor = Cursor::new(zip);
-		let mut zip    = zip::ZipWriter::new(cursor);
-
-		let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-
-		zip.start_file(".modinfo", options)?;
-		zip.write_all(format!("name = \"{}\"", branch.name()?).as_bytes()).expect("Could not write to zip archive!");
-
-		compile::main()?;
-		for entry in WalkDir::new("compiled").follow_links(true) {
-			let entry = entry?;
-			let entry = entry.path(); // I have no idea why I have to do this in two statements
-			if entry.is_file() {
-				let rel = entry.strip_prefix("compiled")?;
-				log!(2; "{} < {}", rel.display(), entry.display());
-				zip.start_file(rel.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
-				zip.write_all(&fs::read(entry)?).expect("Could not write to zip archive!");
-			}
-		};
-
-		zip.finish()?.into_inner()
-	};
-
-	log!(1; "Uploading zip");
-	if remote.file_write("laspad_mod.zip", &zip).is_err() {
-		bail!(PublishError::CantUploadMod);
-	};
-
-	log!(1; "Uploading preview");
-	if remote.file_write("laspad_preview", &branch.preview()?).is_err() {
-		bail!(PublishError::CantUploadPreview);
-	};
 
 	let mut request_update = || {
 		log!(1; "Requesting workshop item update");
-		let u = remote.update_workshop_file(item);
+		let u = ugc.update_item(AppID(4920), item);
 		if u.title(&branch.name()?).is_err() {
 			elog!("Could not update title");
 		};
@@ -125,30 +68,33 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		if u.description(&branch.description()?).is_err() {
 			elog!("Could not update description");
 		};
-		if u.preview("laspad_preview").is_err() {
+		let mut preview_file = NamedTempFile::new()?;
+		preview_file.write_all(&branch.preview()?)?;
+		if u.preview(preview_file.path()).is_err() {
 			elog!("Could not update preview");
 		};
-		if u.contents("laspad_mod.zip").is_err() {
+		if u.content(&Path::new("compiled").canonicalize()?).is_err() {
 			bail!(PublishError::CantUpdateMod);
 		};
-		if Path::new(".git").exists() {
+		let update_note = if Path::new(".git").exists() {
 			let repo = Repository::open(".").expect("Could not open git repo!");
 			let head = repo.head()?;
 			let oid = head.peel_to_commit()?.id();
-			if u.change_description(&format!("git commit: {}", oid)).is_err() {
-				elog!("Could not update version history");
-			};
-		};
-		let apicall = u.commit();
+			Some(format!("git commit: {}", oid))
+		} else {None};
+		let apicall = u.submit(update_note.as_ref().map(|s| s.as_ref()));
 
-		let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
+		let result: SubmitItemUpdateResult = utils.get_apicall_result(apicall);
 
-		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item));
-		if let Ok(item) = result {
-			log!("Published mod: {:X}", item.0);
-		};
+		result::Result::from(result.result)?;
 
-		Ok(result?)
+		ensure!(!result.legal_agreement_required, "You need to accept the workshop legal agreement on https://steamcommunity.com/app/4920/workshop/");
+
+		let item = result.item;
+
+		log!("Published mod: {:X}", item.0);
+
+		Ok(item)
 	};
 
 	if retry {
