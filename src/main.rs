@@ -20,7 +20,6 @@ extern crate command_macros;
 extern crate serde_derive;
 
 extern crate toml;
-extern crate serde_xml_rs;
 extern crate byteorder;
 extern crate regex;
 extern crate git2;
