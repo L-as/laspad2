@@ -31,10 +31,10 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 	where F: FnMut(&Path, &Path) -> Result
 {
 	if path.join(".update_timestamp").exists() {
-		log!(2; ".update_timestamp exists in {}", path.display());
+		trace!(".update_timestamp exists in {}", path.display());
 		iterate_dir(path, f)?;
 	} else if common::is_laspad_project(path) {
-		log!(2; "laspad project exists in {}", path.display());
+		trace!("laspad project exists in {}", path.display());
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
@@ -45,10 +45,10 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 		if src.exists() {
 			iterate_dir(src, f)?;
 		} else {
-			elog!(1; "Found no source directory in {}", path.display());
+			warn!("Found no source directory in {}", path.display());
 		};
 	} else if path.join("mod.settings").exists() {
-		log!(2; "mod.settings exists in {}", path.display());
+		trace!("mod.settings exists in {}", path.display());
 		use regex::Regex;
 		lazy_static! {
 			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
@@ -73,10 +73,10 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 			};
 		};
 		if !found {
-			elog!("Found no source directory in {}", path.display());
+			warn!("Found no source directory in {}", path.display());
 		};
 	} else { // just guess
-		log!(2; "Guessing source directory in {}", path.display());
+		trace!("Guessing source directory in {}", path.display());
 		let mut found = false;
 		for source_dir in [
 			"source",
@@ -86,7 +86,7 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 			let source_dir = &path.join(source_dir);
 			if source_dir.exists() {
 				found = true;
-				log!(2; "Found {} in {}", source_dir.display(), path.display());
+				trace!("Found {} in {}", source_dir.display(), path.display());
 				iterate_dir(source_dir, f)?;
 			};
 		};
@@ -120,12 +120,12 @@ pub fn main() -> Result {
 		let dst = &dst.join(path);
 		let src = root.join(path);
 		if src.is_dir() {
-			log!(2; "DIRECTORY {}", path.display());
+			trace!("DIRECTORY {}", path.display());
 			fs::create_dir_all(dst).with_context(|_| {
 				format!("Could not create directory {}", path.display())
 			})?;
 		} else {
-			log!(2; "{}: {}", root.display(), path.display());
+			trace!("{}: {}", root.display(), path.display());
 			builder.build(&src, path)?;
 		};
 		Ok(())

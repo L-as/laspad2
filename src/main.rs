@@ -3,8 +3,6 @@
 
 #![deny(unused_must_use)]
 
-#![windows_subsystem = "windows"]
-
 #[macro_use]
 extern crate clap;
 #[macro_use]
@@ -12,26 +10,22 @@ extern crate lazy_static;
 #[macro_use]
 extern crate failure;
 #[macro_use]
-extern crate downcast;
-#[macro_use]
 extern crate command_macros;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
 
 extern crate toml;
 extern crate byteorder;
 extern crate regex;
 extern crate git2;
-extern crate termcolor;
 extern crate mime;
 extern crate walkdir;
 extern crate tempfile;
 extern crate rlua;
 extern crate serde;
 //extern crate steamy_vdf as vdf;
-
-#[macro_use]
-mod logger;
 
 mod steam;
 mod md_to_bb;
@@ -48,47 +42,23 @@ mod prepare;
 
 use std::{
 	process::exit,
-	io::Write,
 	env,
 	str::FromStr,
 };
 
-use termcolor::{StandardStream, ColorChoice, ColorSpec, Color, WriteColor};
-
-use crate::logger::Log;
-
-struct StdLog {
-	stdout: StandardStream,
-	stderr: StandardStream,
-}
-
-impl Log for StdLog {
-	fn write(&mut self, priority: i64, line: &str) {
-		if priority > 0 {
-			let _ = self.stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
-			let _ = writeln!(self.stderr, "{}", line);
-			let _ = self.stderr.reset();
-		} else if priority == 0 {
-			let _ = self.stdout.set_color(ColorSpec::new().set_bold(true));
-			let _ = writeln!(self.stdout, "{}", line);
-			let _ = self.stdout.reset();
-		} else {
-			let _ = writeln!(self.stdout, "{}", line);
-		};
-	}
-}
-
 fn main() {
+	let mut builder = env_logger::Builder::from_default_env();
+
 	if env::var_os("RUST_LOG").is_none() {
-		env::set_var("RUST_LOG", "laspad=info")
-	};
+		builder.parse("laspad=info");
+	}
+
+	builder.init();
 
 	let matches = clap_app!(laspad =>
 		(version: crate_version!())
 		(author:  "las <las@protonmail.ch>")
 		(about:   "Replacement of Launch Pad for Natural Selection 2, i.e. can publish mods to workshop.")
-		(@arg VERBOSITY: -v +multiple "Sets verbosity, use multiple times to increase verbosity.")
-		//(@setting SubcommandRequiredElseHelp)
 		(@setting VersionlessSubcommands)
 		(@setting SubcommandRequiredElseHelp)
 		(@subcommand init =>
@@ -134,20 +104,11 @@ vice versa.")
 		)
 	).get_matches();
 
-	logger::set_priority(-(matches.occurrences_of("VERBOSITY") as i64 + 1));
-
-	let log = StdLog {
-		stdout: StandardStream::stdout(ColorChoice::Auto),
-		stderr: StandardStream::stderr(ColorChoice::Auto),
-	};
-
-	logger::set(Box::new(log));
-
 	if let Err(e) = execute_command(&matches) {
 		if cfg!(debug_assertions)  {
-			elog!("Fatal error: {:?}", e);
+			error!("Fatal error: {:?}", e);
 		} else {
-			elog!("Fatal error: {}", e);
+			error!("Fatal error: {}", e);
 		};
 		exit(1);
 	};

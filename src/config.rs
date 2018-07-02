@@ -64,7 +64,7 @@ impl<'a> Config {
 		}
 	}
 	pub fn get(&'a self, key: &str, item: steam::Item) -> Result<Option<Branch<'a>>> {
-		log!(2; "Accessed branch {}", key);
+		trace!("Accessed branch {}", key);
 		match self.0 {
 			ConfigKind::TOML(ref table) => {
 				let v: TOMLBranch = if let Some(v) = table.get(key) {
@@ -256,7 +256,7 @@ pub fn get() -> Result<Config> {
 	let lua  = Path::new("laspad.lua").exists();
 	ensure!(!lua || !toml, "You can not use both Lua *and* TOML configuration files!");
 	if lua {
-		log!(2; "Reading laspad.lua");
+		trace!("Reading laspad.lua");
 		let lua = Box::new(Lua::new());
 		lua_stdlib(&lua)?;
 		let table: LuaTable<'static> = {
@@ -265,7 +265,7 @@ pub fn get() -> Result<Config> {
 		};
 		Ok(Config(ConfigKind::Lua(lua, table)))
 	} else if toml {
-		log!(2; "Reading laspad.toml");
+		trace!("Reading laspad.toml");
 		let toml: toml::Value = fs::read_to_string("laspad.toml")?.parse()?;
 		let toml = if let toml::Value::Table(t) = toml {
 			t

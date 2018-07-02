@@ -19,11 +19,11 @@ pub fn main(lua: bool) -> Result {
 	if lua {
 		File::create("laspad.lua")?.write_all(include_bytes!("../laspad.lua"))?;
 
-		log!("Example laspad.lua created. Please modify it. (Nothing will work properly if you don't)");
+		info!("Example laspad.lua created. Please modify it. (Nothing will work properly if you don't)");
 	} else {
 		File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;
 
-		log!("Example laspad.toml created. Please modify it. (Nothing will work properly if you don't)");
+		info!("Example laspad.toml created. Please modify it. (Nothing will work properly if you don't)");
 	};
 
 	fs::create_dir_all("src")?;

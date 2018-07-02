@@ -29,14 +29,14 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	let config = config::get()?;
 	ensure!(config.contains(branch_name), PublishError::NonexistentBranch { branch: branch_name.to_owned() });
 
-	log!(2; "Connecting to steam process");
+	debug!("Connecting to steam process");
 	let client = steam::Client::new()?;
-	log!(2; "Accessing UGC API");
+	debug!("Accessing UGC API");
 	let mut ugc = client.ugc()?;
-	log!(2; "Accessing Utils API");
+	debug!("Accessing Utils API");
 	let utils = client.utils()?;
 
-	log!(2; "Finding mod id for branch");
+	debug!("Finding mod id for branch");
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
 		steam::Item(u64::from_str_radix(&fs::read_to_string(&modid_file).context("Could not read the modid file")?, 16)?)
@@ -46,32 +46,31 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		result::Result::from(result.result)?;
 		ensure!(!result.legal_agreement_required, "You need to accept the workshop legal agreement on https://steamcommunity.com/app/4920/workshop/");
 		let item = result.item;
-		log!(1; "Created Mod ID: {:X}", item.0);
+		info!("Created Mod ID: {:X}", item.0);
 		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
-	log!(2; "Mod ID: {:X}", item.0);
 
 	compile::main()?;
 
 	let branch = config.get(branch_name, item)?.unwrap();
 
 	let mut request_update = || {
-		log!(1; "Requesting workshop item update");
+		debug!("Requesting workshop item update");
 		let u = ugc.update_item(AppID(4920), item);
 		if u.title(&branch.name()?).is_err() {
-			elog!("Could not update title");
+			warn!("Could not update title");
 		};
 		if u.tags(&branch.tags()?.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
-			elog!("Could not update tags");
+			warn!("Could not update tags");
 		};
 		if u.description(&branch.description()?).is_err() {
-			elog!("Could not update description");
+			warn!("Could not update description");
 		};
 		let mut preview_file = NamedTempFile::new()?;
 		preview_file.write_all(&branch.preview()?)?;
 		if u.preview(preview_file.path()).is_err() {
-			elog!("Could not update preview");
+			warn!("Could not update preview");
 		};
 		if u.content(&Path::new("compiled").canonicalize()?).is_err() {
 			bail!(PublishError::CantUpdateMod);
@@ -92,7 +91,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 
 		let item = result.item;
 
-		log!("Published mod: {:X}", item.0);
+		info!("Published mod: {:X}", item.0);
 
 		Ok(item)
 	};
