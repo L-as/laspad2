@@ -21,7 +21,7 @@ pub enum PublishError {
 	CantUpdateMod,
 }
 
-type Result<T> = ::std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	common::find_project()?;

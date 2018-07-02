@@ -6,7 +6,7 @@ use std::{
 use failure::*;
 use crate::common::*;
 
-type Result<T> = ::std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 struct Rule {
 	outputs: Vec<PathBuf>,

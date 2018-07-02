@@ -9,7 +9,7 @@ use std::{
 
 use failure::*;
 
-type Result<T> = ::std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum Program {

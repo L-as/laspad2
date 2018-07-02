@@ -7,7 +7,7 @@ use std::{
 use crate::common::*;
 
 use failure::*;
-type Result<T> = ::std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 pub fn main(root: Option<&str>) -> Result<PathBuf> {
 	find_project()?;

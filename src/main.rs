@@ -16,17 +16,6 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 
-extern crate toml;
-extern crate byteorder;
-extern crate regex;
-extern crate git2;
-extern crate mime;
-extern crate walkdir;
-extern crate tempfile;
-extern crate rlua;
-extern crate serde;
-//extern crate steamy_vdf as vdf;
-
 mod steam;
 mod md_to_bb;
 mod common;

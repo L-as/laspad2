@@ -14,7 +14,7 @@ use rlua::{FromLua, self, prelude::*};
 use crate::steam;
 use crate::md_to_bb;
 
-type Result<T> = ::std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Deserialize)]
 struct TOMLBranch {

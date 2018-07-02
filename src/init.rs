@@ -11,7 +11,7 @@ enum InitError {
 	AlreadyExists,
 }
 
-type Result = ::std::result::Result<(), Error>;
+type Result = std::result::Result<(), Error>;
 
 pub fn main(lua: bool) -> Result {
 	ensure!(!common::is_laspad_project("."), InitError::AlreadyExists);

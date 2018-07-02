@@ -10,7 +10,7 @@ use tempfile::tempdir;
 use crate::common;
 use crate::builder::Builder;
 
-type Result = ::std::result::Result<(), Error>;
+type Result = std::result::Result<(), Error>;
 
 fn iterate_dir<F>(root: &Path, f: &mut F) -> Result
 	where F: FnMut(&Path, &Path) -> Result
