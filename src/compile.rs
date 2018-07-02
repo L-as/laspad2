@@ -7,8 +7,8 @@ use failure::*;
 use walkdir::WalkDir;
 use tempfile::tempdir;
 
-use common;
-use builder::Builder;
+use crate::common;
+use crate::builder::Builder;
 
 type Result = ::std::result::Result<(), Error>;
 

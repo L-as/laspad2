@@ -55,7 +55,7 @@ use std::{
 
 use termcolor::{StandardStream, ColorChoice, ColorSpec, Color, WriteColor};
 
-use logger::Log;
+use crate::logger::Log;
 
 struct StdLog {
 	stdout: StandardStream,

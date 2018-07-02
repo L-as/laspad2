@@ -38,7 +38,7 @@ impl FromStr for Program {
 }
 
 pub fn main(root: Option<&str>, program: Program) -> Result<()> {
-	let path = ::prepare::main(root)?;
+	let path = crate::prepare::main(root)?;
 
 	let current_dir = env::current_dir()?;
 	env::set_current_dir(path)?;

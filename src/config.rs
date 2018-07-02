@@ -11,8 +11,8 @@ use failure::*;
 use toml;
 use rlua::{FromLua, self, prelude::*};
 
-use steam;
-use md_to_bb;
+use crate::steam;
+use crate::md_to_bb;
 
 type Result<T> = ::std::result::Result<T, Error>;
 

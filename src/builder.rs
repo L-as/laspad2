@@ -4,7 +4,7 @@ use std::{
 	fs,
 };
 use failure::*;
-use common::*;
+use crate::common::*;
 
 type Result<T> = ::std::result::Result<T, Error>;
 

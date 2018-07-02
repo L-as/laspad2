@@ -6,10 +6,10 @@ use failure::*;
 use git2::Repository;
 use tempfile::NamedTempFile;
 
-use steam::{GeneralError as SteamError, *, self};
-use compile;
-use common;
-use config;
+use crate::steam::{GeneralError as SteamError, *, self};
+use crate::compile;
+use crate::common;
+use crate::config;
 
 #[derive(Debug, Fail)]
 pub enum PublishError {

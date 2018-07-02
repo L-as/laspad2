@@ -4,14 +4,14 @@ use std::{
 	fs,
 };
 
-use common::*;
+use crate::common::*;
 
 use failure::*;
 type Result<T> = ::std::result::Result<T, Error>;
 
 pub fn main(root: Option<&str>) -> Result<PathBuf> {
 	find_project()?;
-	::compile::main()?;
+	crate::compile::main()?;
 
 	let path = root.map_or_else(|| get_ns2(), |root| PathBuf::from(root).join("x64"));
 

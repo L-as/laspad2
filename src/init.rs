@@ -3,7 +3,7 @@ use std::io::{Write};
 use std::path::Path;
 use failure::*;
 
-use common;
+use crate::common;
 
 #[derive(Debug, Fail)]
 enum InitError {
