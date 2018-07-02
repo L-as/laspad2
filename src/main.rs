@@ -1,4 +1,5 @@
 #![feature(extern_types)]
+#![feature(proc_macro, proc_macro_non_items)]
 #![feature(slice_concat_ext)]
 
 #![deny(unused_must_use)]
@@ -10,11 +11,11 @@ extern crate lazy_static;
 #[macro_use]
 extern crate failure;
 #[macro_use]
-extern crate command_macros;
-#[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate log;
+
+extern crate command_macros;
 
 mod steam;
 mod md_to_bb;

@@ -16,15 +16,15 @@ lazy_static    = "1"
 byteorder      = "1"
 serde          = "1"
 serde_derive   = "1"
-rlua           = "0.13"
+regex          = "1"
+rlua           = "0.14"
 git2           = "0.7"
 env_logger     = "0.5.10"
 log            = "0.4.3"
 toml           = "0.4"
 mime           = "0.3"
-regex          = "0.2"
 #steamy-vdf    = "0.2"
-command-macros = "0.1.10"
+command-macros = {version = "0.2.3", features = ["nightly"]}
 failure        = "0.1"
 
 [build-dependencies]

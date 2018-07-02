@@ -6,6 +6,8 @@ use std::{
 use failure::*;
 use crate::common::*;
 
+use command_macros::command;
+
 type Result<T> = std::result::Result<T, Error>;
 
 struct Rule {
@@ -32,15 +34,15 @@ impl Builder {
 					let overview = PathBuf::from(s);
 					Some(Rule {
 						outputs: vec![dst.to_owned(), overview.with_extension("tga"), overview.with_extension("hmp")],
-						cmd:     cmd!((get_ns2().join("Overview.exe")) (src) compiled),
+						cmd:     command!((get_ns2().join("Overview.exe")) (src) compiled),
 					})
 				},
 				"psd"   => {
 					let dst = dst.with_extension("dds");
 					let cmd = if src.ends_with("_normal.psd") {
-						cmd!((get_ns2().join("../utils/nvcompress")) (-normal) (-bc1) (src) (self.new.join(&dst)))
+						command!((get_ns2().join("../utils/nvcompress")) -normal -bc1 (src) (self.new.join(&dst)))
 					} else {
-						cmd!((get_ns2().join("../utils/nvcompress"))           (-bc3) (src) (self.new.join(&dst)))
+						command!((get_ns2().join("../utils/nvcompress"))         -bc3 (src) (self.new.join(&dst)))
 					};
 					let outputs = vec![dst];
 
