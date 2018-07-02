@@ -40,6 +40,7 @@ enum BranchKind<'a> {
 pub struct Branch<'a>(BranchKind<'a>, steam::Item);
 pub struct Config(ConfigKind);
 impl<'a> Config {
+	#[allow(dead_code)]
 	pub fn branches(&'a self) -> Result<Vec<Cow<'a, str>>> {
 		match self.0 {
 			ConfigKind::TOML(ref table) => {
