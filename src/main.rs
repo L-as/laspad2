@@ -29,16 +29,12 @@ mod publish;
 mod launch;
 mod prepare;
 
-use std::{
-	process::exit,
-	env,
-	str::FromStr,
-};
+use std::str::FromStr;
 
-fn main() {
+fn main() -> Result<(), failure::Error> {
 	let mut builder = env_logger::Builder::from_default_env();
 
-	if env::var_os("RUST_LOG").is_none() {
+	if std::env::var_os("RUST_LOG").is_none() {
 		builder.parse("laspad=info");
 	}
 
@@ -93,17 +89,6 @@ vice versa.")
 		)
 	).get_matches();
 
-	if let Err(e) = execute_command(&matches) {
-		if cfg!(debug_assertions)  {
-			error!("Fatal error: {:?}", e);
-		} else {
-			error!("Fatal error: {}", e);
-		};
-		exit(1);
-	};
-}
-
-fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Error> {
 	match matches.subcommand() {
 		("init",     Some(m)) =>    init::main(m.is_present("LUA")),
 		("compile",  Some(_)) => compile::main(),
