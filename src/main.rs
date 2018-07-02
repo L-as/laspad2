@@ -1,5 +1,4 @@
 #![feature(extern_types)]
-#![feature(repr_transparent)]
 #![feature(slice_concat_ext)]
 
 #![deny(unused_must_use)]
@@ -23,10 +22,7 @@ extern crate toml;
 extern crate byteorder;
 extern crate regex;
 extern crate git2;
-extern crate web_view;
 extern crate termcolor;
-extern crate futures;
-extern crate hyper;
 extern crate mime;
 extern crate walkdir;
 extern crate tempfile;
@@ -39,7 +35,6 @@ mod logger;
 
 mod steam;
 mod md_to_bb;
-mod ui;
 mod common;
 mod builder;
 mod config;
@@ -95,6 +90,7 @@ fn main() {
 		(@arg VERBOSITY: -v +multiple "Sets verbosity, use multiple times to increase verbosity.")
 		//(@setting SubcommandRequiredElseHelp)
 		(@setting VersionlessSubcommands)
+		(@setting SubcommandRequiredElseHelp)
 		(@subcommand init =>
 		 	(about: "Initialises laspad in the current directory")
 			(@arg LUA: -l --lua "\
@@ -159,7 +155,6 @@ vice versa.")
 
 fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Error> {
 	match matches.subcommand() {
-		("",         None)    =>      ui::main(),
 		("init",     Some(m)) =>    init::main(m.is_present("LUA")),
 		("compile",  Some(_)) => compile::main(),
 		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY")),

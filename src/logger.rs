@@ -1,4 +1,4 @@
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 use std::ops::{DerefMut, Deref};
 use downcast::Any;
 
@@ -52,15 +52,6 @@ pub fn get_priority() -> i64 {
 pub fn set(log: Box<Log>) {
 	let mut lock = MUTEX.lock().unwrap();
 	lock.log = Some(log);
-}
-
-pub fn get() -> MutexGuard<'static, State> {
-	MUTEX.lock().unwrap()
-}
-
-pub fn remove() -> Option<Box<Log>> {
-	let mut lock = MUTEX.lock().unwrap();
-	lock.log.take()
 }
 
 pub fn log(priority: i64, line: &str) {
