@@ -27,11 +27,8 @@ extern crate zip;
 extern crate curl;
 extern crate regex;
 extern crate git2;
-extern crate web_view;
 extern crate termcolor;
 extern crate futures;
-extern crate hyper;
-extern crate mime;
 extern crate walkdir;
 extern crate mktemp;
 extern crate rlua;
@@ -42,7 +39,6 @@ mod logger;
 
 mod steam;
 mod md_to_bb;
-mod ui;
 mod common;
 mod builder;
 mod config;
@@ -171,7 +167,7 @@ vice versa.")
 
 fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Error> {
 	match matches.subcommand() {
-		("",         None)    =>      ui::main(),
+		("",         None)    =>      unimplemented!("UI is unimplemented!"),
 		("init",     Some(m)) =>    init::main(m.is_present("LUA")),
 		("need",     Some(m)) =>    need::main(m.value_of("MODID").unwrap()),
 		("update",   Some(_)) =>  update::main(),
