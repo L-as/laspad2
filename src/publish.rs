@@ -10,9 +10,9 @@ use std::{
 use crate::{
 	common,
 	config,
+	package,
 	steam::{self, GeneralError as SteamError},
 	update,
-	package,
 };
 
 #[derive(Debug, Fail)]

@@ -4,12 +4,6 @@
 #![deny(unused_must_use)]
 
 #[macro_use]
-extern crate clap;
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate failure;
 #[macro_use]
 extern crate downcast;
@@ -29,13 +23,13 @@ mod compile;
 mod init;
 mod launch;
 mod need;
-mod prepare;
 mod package;
+mod prepare;
 mod publish;
 mod update;
 
+use clap::{clap_app, crate_version};
 use std::{env, io::Write, process::exit, str::FromStr};
-
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use crate::logger::Log;

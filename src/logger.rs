@@ -1,4 +1,5 @@
 use downcast::Any;
+use lazy_static::lazy_static;
 use std::{
 	ops::{Deref, DerefMut},
 	sync::{Mutex, MutexGuard},

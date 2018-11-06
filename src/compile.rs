@@ -1,4 +1,5 @@
 use failure::*;
+use lazy_static::lazy_static;
 use std::{
 	fs::{self, File},
 	io::Read,

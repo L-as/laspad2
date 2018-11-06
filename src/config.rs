@@ -1,7 +1,7 @@
-use std::{borrow::Cow, ffi::OsStr, fs, path::Path};
-
 use failure::*;
 use git2::Repository;
+use serde_derive::Deserialize;
+use std::{borrow::Cow, ffi::OsStr, fs, path::Path};
 use toml;
 
 use crate::{md_to_bb, steam};

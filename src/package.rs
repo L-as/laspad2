@@ -6,11 +6,7 @@ use std::{
 use walkdir::WalkDir;
 use zip::write::ZipWriter;
 
-use crate::{
-	common,
-	compile,
-	config,
-};
+use crate::{common, compile, config};
 
 pub fn zip<T: Write + Seek>(branch_name: &str, out: T) -> Fallible<T> {
 	let config = config::get()?;

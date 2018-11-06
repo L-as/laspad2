@@ -14,6 +14,8 @@ use crate::{common, steam::Item};
 type Result<T> = ::std::result::Result<T, Error>;
 
 mod ns2_xml_format {
+	use serde_derive::Deserialize;
+
 	#[derive(Deserialize, Debug)]
 	pub struct PublishedFile {
 		pub publishedfileid: u64,
