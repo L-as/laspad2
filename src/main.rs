@@ -30,6 +30,7 @@ mod init;
 mod launch;
 mod need;
 mod prepare;
+mod package;
 mod publish;
 mod update;
 
@@ -97,6 +98,11 @@ fn main() {
 				vice versa.
 			"))
 		)
+		(@subcommand package =>
+			(about: "Compiles the mod and then packages into a zip file which can be published")
+			(@arg PATH: +required "Name of zip file generated")
+			(@arg BRANCH: "The branch to package, defaults to master")
+		)
 		(@subcommand publish =>
 			(about: "Updates dependencies and then publishes the mod to workshop")
 			(@arg BRANCH: "The branch to publish, defaults to master")
@@ -146,6 +152,10 @@ fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Er
 		("need", Some(m)) => need::main(m.value_of("MODID").unwrap()),
 		("update", Some(_)) => update::main(),
 		("compile", Some(_)) => compile::main(),
+		("package", Some(m)) => package::main(
+			m.value_of("BRANCH").unwrap_or("master"),
+			m.value_of("PATH").unwrap(),
+		),
 		("publish", Some(m)) => publish::main(
 			m.value_of("BRANCH").unwrap_or("master"),
 			m.is_present("RETRY"),

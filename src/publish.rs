@@ -2,18 +2,17 @@ use failure::*;
 use git2::Repository;
 use std::{
 	fs,
-	io::{Cursor, Write},
+	io::Cursor,
 	path::{Path, PathBuf},
 	result::Result as StdResult,
 };
-use zip;
 
 use crate::{
 	common,
-	compile,
 	config,
 	steam::{self, GeneralError as SteamError},
 	update,
+	package,
 };
 
 #[derive(Debug, Fail)]
@@ -87,44 +86,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 
 	update::main()?;
 
-	log!(1; "Zipping up files");
-	let zip = Vec::new();
-	let zip = {
-		use walkdir::WalkDir;
-
-		let cursor = Cursor::new(zip);
-		let mut zip = zip::ZipWriter::new(cursor);
-
-		let options =
-			zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-
-		zip.start_file(".modinfo", options)?;
-		zip.write_all(format!("name = \"{}\"", branch.name()?).as_bytes())
-			.expect("Could not write to zip archive!");
-
-		compile::main()?;
-		for entry in WalkDir::new("compiled").follow_links(true) {
-			let entry = entry?;
-			let entry = entry.path(); // I have no idea why I have to do this in two statements
-			if entry.is_file() {
-				let rel = entry.strip_prefix("compiled")?;
-				log!(2; "{} < {}", rel.display(), entry.display());
-				zip.start_file(
-					rel.to_str()
-						.unwrap()
-						.clone()
-						.chars()
-						.map(|c| if cfg!(windows) && c == '\\' { '/' } else { c })
-						.collect::<String>(),
-					options,
-				)?;
-				zip.write_all(&fs::read(entry)?)
-					.expect("Could not write to zip archive!");
-			}
-		}
-
-		zip.finish()?.into_inner()
-	};
+	let zip = package::zip(branch_name, Cursor::new(Vec::new()))?.into_inner();
 
 	log!(1; "Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
