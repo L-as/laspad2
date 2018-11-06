@@ -13,6 +13,8 @@ extern crate lazy_static;
 extern crate failure;
 #[macro_use]
 extern crate downcast;
+#[macro_use]
+extern crate indoc;
 
 #[macro_use]
 mod logger;
@@ -88,11 +90,12 @@ fn main() {
 			(@arg PATH:  +required "Where to extract it")
 		)
 		(@subcommand compile =>
-			(about: "\
-Merges the dependencies and the `src` folder together into the `compiled` folder.
-NB: The files in the `compiled` folder are actually hard links.
-This means that changes in the compiled files will be reflected in the source and
-vice versa.")
+			(about: indoc!("
+				Merges the dependencies and the `src` folder together into the `compiled` folder.
+				NB: The files in the `compiled` folder are actually hard links.
+				This means that changes in the compiled files will be reflected in the source and
+				vice versa.
+			"))
 		)
 		(@subcommand publish =>
 			(about: "Updates dependencies and then publishes the mod to workshop")
