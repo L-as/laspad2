@@ -19,7 +19,6 @@ extern crate command_macros;
 
 extern crate byteorder;
 extern crate curl;
-extern crate futures;
 extern crate git2;
 extern crate mktemp;
 extern crate regex;
