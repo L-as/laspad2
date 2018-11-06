@@ -2,7 +2,6 @@
 #![feature(slice_concat_ext)]
 #![allow(safe_packed_borrows)]
 #![deny(unused_must_use)]
-#![windows_subsystem = "windows"]
 
 #[macro_use]
 extern crate clap;

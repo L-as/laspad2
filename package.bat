@@ -9,7 +9,6 @@ md laspad
 
 copy "3rdparty\steam_api64.dll"  laspad
 copy "steam_appid.txt"           laspad
-copy "laspad.bat"                laspad
-copy "target\release\laspad.exe" laspad\laspad-gui.exe
+copy "target\release\laspad.exe" laspad
 
 7z a laspad.7z laspad
