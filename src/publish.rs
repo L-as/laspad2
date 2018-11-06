@@ -8,11 +8,13 @@ use std::{
 };
 use zip;
 
-use common;
-use compile;
-use config;
-use steam::{self, GeneralError as SteamError};
-use update;
+use crate::{
+	common,
+	compile,
+	config,
+	steam::{self, GeneralError as SteamError},
+	update,
+};
 
 #[derive(Debug, Fail)]
 pub enum PublishError {
@@ -90,7 +92,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	let zip = {
 		use walkdir::WalkDir;
 
-		let mut cursor = Cursor::new(zip);
+		let cursor = Cursor::new(zip);
 		let mut zip = zip::ZipWriter::new(cursor);
 
 		let options =

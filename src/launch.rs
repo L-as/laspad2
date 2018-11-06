@@ -13,7 +13,7 @@ pub enum Program {
 }
 
 impl fmt::Display for Program {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.write_str(match *self {
 			Program::NS2 => "ns2",
 			Program::Editor => "editor",
@@ -34,7 +34,7 @@ impl FromStr for Program {
 }
 
 pub fn main(root: Option<&str>, program: Program) -> Result<()> {
-	let path = ::prepare::main(root)?;
+	let path = crate::prepare::main(root)?;
 
 	let current_dir = env::current_dir()?;
 	env::set_current_dir(path)?;

@@ -17,17 +17,6 @@ extern crate downcast;
 #[macro_use]
 extern crate command_macros;
 
-extern crate byteorder;
-extern crate curl;
-extern crate git2;
-extern crate mktemp;
-extern crate regex;
-extern crate serde;
-extern crate serde_xml_rs;
-extern crate termcolor;
-extern crate toml;
-extern crate walkdir;
-extern crate zip;
 // extern crate steamy_vdf as vdf;
 
 #[macro_use]
@@ -52,7 +41,7 @@ use std::{env, io::Write, process::exit, str::FromStr};
 
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-use logger::Log;
+use crate::logger::Log;
 
 struct StdLog {
 	stdout: StandardStream,

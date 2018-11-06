@@ -5,7 +5,7 @@ use std::{
 };
 
 pub struct State {
-	log:          Option<Box<Log>>,
+	log:          Option<Box<dyn Log>>,
 	min_priority: i64,
 }
 
@@ -19,7 +19,7 @@ impl Default for State {
 }
 
 impl Deref for State {
-	type Target = Option<Box<Log>>;
+	type Target = Option<Box<dyn Log>>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.log
@@ -40,7 +40,7 @@ pub trait Log: Send + Any {
 	fn write(&mut self, priority: i64, line: &str);
 }
 
-downcast!(Log);
+downcast!(dyn Log);
 
 pub fn set_priority(priority: i64) {
 	let mut lock = MUTEX.lock().unwrap();
@@ -52,7 +52,7 @@ pub fn get_priority() -> i64 {
 	lock.min_priority
 }
 
-pub fn set(log: Box<Log>) {
+pub fn set(log: Box<dyn Log>) {
 	let mut lock = MUTEX.lock().unwrap();
 	lock.log = Some(log);
 }
@@ -61,7 +61,7 @@ pub fn get() -> MutexGuard<'static, State> {
 	MUTEX.lock().unwrap()
 }
 
-pub fn remove() -> Option<Box<Log>> {
+pub fn remove() -> Option<Box<dyn Log>> {
 	let mut lock = MUTEX.lock().unwrap();
 	lock.log.take()
 }

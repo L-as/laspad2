@@ -7,8 +7,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
-use builder::Builder;
-use common;
+use crate::{builder::Builder, common};
 
 type Result = ::std::result::Result<(), Error>;
 

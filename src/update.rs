@@ -9,8 +9,7 @@ use std::{
 };
 use zip::read::ZipArchive;
 
-use common;
-use steam::Item;
+use crate::{common, steam::Item};
 
 type Result<T> = ::std::result::Result<T, Error>;
 

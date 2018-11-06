@@ -5,7 +5,7 @@ use std::{
 	path::Path,
 };
 
-use common;
+use crate::common;
 
 #[derive(Debug, Fail)]
 enum InitError {

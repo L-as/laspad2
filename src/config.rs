@@ -4,8 +4,7 @@ use failure::*;
 use git2::Repository;
 use toml;
 
-use md_to_bb;
-use steam;
+use crate::{md_to_bb, steam};
 
 type Result<T> = ::std::result::Result<T, Error>;
 
@@ -59,13 +58,13 @@ impl<'a> Config {
 }
 
 impl Branch {
-	pub fn name(&self) -> Result<Cow<str>> {
+	pub fn name(&self) -> Result<Cow<'_, str>> {
 		match self.0 {
 			BranchKind::TOML(ref branch) => Ok(Cow::Borrowed(&branch.name)),
 		}
 	}
 
-	pub fn tags(&self) -> Result<Cow<[String]>> {
+	pub fn tags(&self) -> Result<Cow<'_, [String]>> {
 		match self.0 {
 			BranchKind::TOML(ref branch) => Ok(Cow::Borrowed(&branch.tags)),
 		}
@@ -92,7 +91,7 @@ impl Branch {
 		}
 		match self.0 {
 			BranchKind::TOML(ref branch) => {
-				let mut preview = if let Some(preview) = branch.preview.as_ref() {
+				let preview = if let Some(preview) = branch.preview.as_ref() {
 					fs::read(preview).context("Could not read preview")?
 				} else {
 					Default::default()

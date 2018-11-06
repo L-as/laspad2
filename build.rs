@@ -1,5 +1,3 @@
-extern crate curl;
-
 use std::{
 	fs::{self, File},
 	io::Write,
