@@ -1,5 +1,4 @@
 use failure::*;
-use mktemp::Temp;
 use std::{
 	fs::{self, File},
 	io::Read,
@@ -7,7 +6,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
-use crate::{builder::Builder, common};
+use crate::common;
 
 type Result = ::std::result::Result<(), Error>;
 
@@ -106,22 +105,6 @@ pub fn main() -> Result {
 
 	let dst = Path::new("compiled");
 
-	// We can copy from this location if the files are still valid.
-	// This is useful for e.g. overviews, since if a bundled map doesn't change
-	// there will be no reason to regenerate it. Then it can simply be
-	// copied over from the old directory. If not, the old one will simply
-	// disappear at the end of this scope.
-	let old = if dst.exists() {
-		let dir = Temp::new_in(".");
-		fs::rename(dst, &dir).unwrap();
-		Some(dir)
-	} else {
-		None
-	};
-	fs::create_dir(dst)?;
-
-	let mut builder = Builder::new(dst.to_path_buf(), old.map(|o| o.to_path_buf()));
-
 	iterate_files(&Path::new("."), &mut |root, path| {
 		let dst = &dst.join(path);
 		let src = root.join(path);
@@ -131,10 +114,11 @@ pub fn main() -> Result {
 				.with_context(|_| format!("Could not create directory {}", path.display()))?;
 		} else {
 			log!(2; "{}: {}", root.display(), path.display());
-			builder.build(&src, path)?;
+			if dst.exists() {
+				fs::remove_file(dst)?
+			};
+			fs::hard_link(src, dst)?;
 		};
 		Ok(())
-	})?;
-
-	builder.build_rest()
+	})
 }

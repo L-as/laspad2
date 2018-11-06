@@ -14,15 +14,10 @@ extern crate lazy_static;
 extern crate failure;
 #[macro_use]
 extern crate downcast;
-#[macro_use]
-extern crate command_macros;
-
-// extern crate steamy_vdf as vdf;
 
 #[macro_use]
 mod logger;
 
-mod builder;
 mod common;
 mod config;
 mod md_to_bb;
