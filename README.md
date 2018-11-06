@@ -9,7 +9,6 @@ Features:
 * Can launch NS2/Editor with the current project
 * Can also launch NS2/Editor for projects that have unusual paths (e.g. with spaces)
 * Has sane project configuration
-* TOML or Lua for configuration
 * Doesn't fuck up your formatting
 * Previews of any type, not just 512x512 JPEGs
 * Sane builder-like functionality

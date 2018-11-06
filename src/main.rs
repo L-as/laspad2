@@ -31,7 +31,6 @@ extern crate termcolor;
 extern crate futures;
 extern crate walkdir;
 extern crate mktemp;
-extern crate rlua;
 //extern crate steamy_vdf as vdf;
 
 #[macro_use]
@@ -98,11 +97,6 @@ fn main() {
 		(@setting VersionlessSubcommands)
 		(@subcommand init =>
 		 	(about: "Initialises laspad in the current directory")
-			(@arg LUA: -l --lua "\
-Recommended for advanced users.
-Set this to generate a laspad project that uses a Lua configuration file instead.
-Using Lua for configuration files allows you to customize the project much more,
-including custom build rules.")
 		)
 		(@subcommand need =>
 			(about: "Makes workshop item dependency")
@@ -167,8 +161,8 @@ vice versa.")
 
 fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Error> {
 	match matches.subcommand() {
-		("",         None)    =>      unimplemented!("UI is unimplemented!"),
-		("init",     Some(m)) =>    init::main(m.is_present("LUA")),
+		("",         None)    =>    unimplemented!("UI is unimplemented!"),
+		("init",     None)    =>    init::main(),
 		("need",     Some(m)) =>    need::main(m.value_of("MODID").unwrap()),
 		("update",   Some(_)) =>  update::main(),
 		("compile",  Some(_)) => compile::main(),

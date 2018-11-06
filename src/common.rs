@@ -27,5 +27,5 @@ pub fn get_ns2() -> PathBuf {
 
 pub fn is_laspad_project<P: AsRef<Path>>(path: P) -> bool {
 	let path = path.as_ref();
-	path.join("laspad.toml").exists() || path.join("laspad.lua").exists()
+	path.join("laspad.toml").exists()
 }

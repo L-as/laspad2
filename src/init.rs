@@ -13,18 +13,12 @@ enum InitError {
 
 type Result = ::std::result::Result<(), Error>;
 
-pub fn main(lua: bool) -> Result {
+pub fn main() -> Result {
 	ensure!(!common::is_laspad_project("."), InitError::AlreadyExists);
 
-	if lua {
-		File::create("laspad.lua")?.write_all(include_bytes!("../laspad.lua"))?;
+	File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;
 
-		log!("Example laspad.lua created. Please modify it. (Nothing will work properly if you don't)");
-	} else {
-		File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;
-
-		log!("Example laspad.toml created. Please modify it. (Nothing will work properly if you don't)");
-	};
+	log!("Example laspad.toml created. Please modify it. (Nothing will work properly if you don't)");
 
 	fs::create_dir_all("src")?;
 
