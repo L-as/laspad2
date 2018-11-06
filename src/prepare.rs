@@ -1,8 +1,4 @@
-use std::{
-	path::PathBuf,
-	env,
-	fs,
-};
+use std::{env, fs, path::PathBuf};
 
 use common::*;
 
@@ -15,13 +11,15 @@ pub fn main(root: Option<&str>) -> Result<PathBuf> {
 
 	let path = root.map_or_else(|| get_ns2(), |root| PathBuf::from(root).join("x64"));
 
+	#[cfg(not(windows))]
+	use std::os::unix::fs::symlink;
 	#[cfg(windows)]
 	use std::os::windows::fs::symlink_dir as symlink;
-	#[cfg(not(windows))]
-	use std::os::unix::fs::symlink as symlink;
 
 	let mod_dir = &path.join("../laspad_mod");
-	if mod_dir.exists() {fs::remove_file(mod_dir)?};
+	if mod_dir.exists() {
+		fs::remove_file(mod_dir)?
+	};
 	let compiled = &env::current_dir()?.join("compiled");
 	symlink(compiled, mod_dir)?;
 

@@ -1,6 +1,8 @@
-use std::sync::{Mutex, MutexGuard};
-use std::ops::{DerefMut, Deref};
 use downcast::Any;
+use std::{
+	ops::{Deref, DerefMut},
+	sync::{Mutex, MutexGuard},
+};
 
 pub struct State {
 	log:          Option<Box<Log>>,
@@ -10,7 +12,7 @@ pub struct State {
 impl Default for State {
 	fn default() -> Self {
 		State {
-			log: None,
+			log:          None,
 			min_priority: -1,
 		}
 	}
@@ -18,6 +20,7 @@ impl Default for State {
 
 impl Deref for State {
 	type Target = Option<Box<Log>>;
+
 	fn deref(&self) -> &Self::Target {
 		&self.log
 	}
@@ -65,12 +68,13 @@ pub fn remove() -> Option<Box<Log>> {
 
 pub fn log(priority: i64, line: &str) {
 	let mut lock = MUTEX.lock().unwrap();
-	if priority < lock.min_priority {return};
+	if priority < lock.min_priority {
+		return;
+	};
 	if let Some(ref mut log) = lock.log {
 		log.write(priority, line);
 	};
 }
-
 
 macro_rules! elog {
 	($priority:expr; $($arg:tt)*) => {{

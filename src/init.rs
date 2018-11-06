@@ -1,7 +1,9 @@
-use std::fs::{self, File, OpenOptions};
-use std::io::{Write};
-use std::path::Path;
 use failure::*;
+use std::{
+	fs::{self, File, OpenOptions},
+	io::Write,
+	path::Path,
+};
 
 use common;
 
@@ -18,7 +20,9 @@ pub fn main() -> Result {
 
 	File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;
 
-	log!("Example laspad.toml created. Please modify it. (Nothing will work properly if you don't)");
+	log!(
+		"Example laspad.toml created. Please modify it. (Nothing will work properly if you don't)"
+	);
 
 	fs::create_dir_all("src")?;
 

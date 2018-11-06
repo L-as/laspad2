@@ -1,9 +1,7 @@
 #![feature(extern_types)]
 #![feature(slice_concat_ext)]
-
 #![allow(safe_packed_borrows)]
 #![deny(unused_must_use)]
-
 #![windows_subsystem = "windows"]
 
 #[macro_use]
@@ -19,46 +17,41 @@ extern crate downcast;
 #[macro_use]
 extern crate command_macros;
 
-extern crate toml;
+extern crate byteorder;
+extern crate curl;
+extern crate futures;
+extern crate git2;
+extern crate mktemp;
+extern crate regex;
 extern crate serde;
 extern crate serde_xml_rs;
-extern crate byteorder;
-extern crate zip;
-extern crate curl;
-extern crate regex;
-extern crate git2;
 extern crate termcolor;
-extern crate futures;
+extern crate toml;
 extern crate walkdir;
-extern crate mktemp;
-//extern crate steamy_vdf as vdf;
+extern crate zip;
+// extern crate steamy_vdf as vdf;
 
 #[macro_use]
 mod logger;
 
-mod steam;
-mod md_to_bb;
-mod common;
 mod builder;
+mod common;
 mod config;
+mod md_to_bb;
+mod steam;
 
 // console commands
-mod init;
-mod need;
-mod update;
 mod compile;
-mod publish;
+mod init;
 mod launch;
+mod need;
 mod prepare;
+mod publish;
+mod update;
 
-use std::{
-	process::exit,
-	io::Write,
-	env,
-	str::FromStr,
-};
+use std::{env, io::Write, process::exit, str::FromStr};
 
-use termcolor::{StandardStream, ColorChoice, ColorSpec, Color, WriteColor};
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use logger::Log;
 
@@ -70,7 +63,9 @@ struct StdLog {
 impl Log for StdLog {
 	fn write(&mut self, priority: i64, line: &str) {
 		if priority > 0 {
-			let _ = self.stderr.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
+			let _ = self
+				.stderr
+				.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
 			let _ = writeln!(self.stderr, "{}", line);
 			let _ = self.stderr.reset();
 		} else if priority == 0 {
@@ -150,7 +145,7 @@ vice versa.")
 	logger::set(Box::new(log));
 
 	if let Err(e) = execute_command(&matches) {
-		if cfg!(debug_assertions)  {
+		if cfg!(debug_assertions) {
 			elog!("Fatal error: {:?}", e);
 		} else {
 			elog!("Fatal error: {}", e);
@@ -161,14 +156,20 @@ vice versa.")
 
 fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Error> {
 	match matches.subcommand() {
-		("",         None)    =>    unimplemented!("UI is unimplemented!"),
-		("init",     None)    =>    init::main(),
-		("need",     Some(m)) =>    need::main(m.value_of("MODID").unwrap()),
-		("update",   Some(_)) =>  update::main(),
-		("compile",  Some(_)) => compile::main(),
-		("publish",  Some(m)) => publish::main(m.value_of("BRANCH").unwrap_or("master"), m.is_present("RETRY")),
-		("launch",   Some(m)) =>  launch::main(m.value_of("NS2ROOT"), launch::Program::from_str(m.subcommand_name().unwrap())?),
-		("prepare",  Some(m)) => prepare::main(m.value_of("NS2ROOT")).map(|_| ()),
+		("", None) => unimplemented!("UI is unimplemented!"),
+		("init", None) => init::main(),
+		("need", Some(m)) => need::main(m.value_of("MODID").unwrap()),
+		("update", Some(_)) => update::main(),
+		("compile", Some(_)) => compile::main(),
+		("publish", Some(m)) => publish::main(
+			m.value_of("BRANCH").unwrap_or("master"),
+			m.is_present("RETRY"),
+		),
+		("launch", Some(m)) => launch::main(
+			m.value_of("NS2ROOT"),
+			launch::Program::from_str(m.subcommand_name().unwrap())?,
+		),
+		("prepare", Some(m)) => prepare::main(m.value_of("NS2ROOT")).map(|_| ()),
 		("download", Some(m)) => {
 			use std::fs;
 

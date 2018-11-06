@@ -1,34 +1,37 @@
+use failure::*;
+use mktemp::Temp;
 use std::{
 	fs::{self, File},
 	io::Read,
 	path::Path,
 };
-use failure::*;
 use walkdir::WalkDir;
-use mktemp::Temp;
 
-use common;
 use builder::Builder;
+use common;
 
 type Result = ::std::result::Result<(), Error>;
 
 fn iterate_dir<F>(root: &Path, f: &mut F) -> Result
-	where F: FnMut(&Path, &Path) -> Result
+where
+	F: FnMut(&Path, &Path) -> Result,
 {
-	for entry in WalkDir::new(root)
-		.into_iter()
-		.filter_entry(|e| e.file_name().to_str().map_or(true, |s| s.chars().next() != Some('.')))
-	{
+	for entry in WalkDir::new(root).into_iter().filter_entry(|e| {
+		e.file_name()
+			.to_str()
+			.map_or(true, |s| s.chars().next() != Some('.'))
+	}) {
 		let entry = entry?;
-		let rel   = entry.path().strip_prefix(root)?;
+		let rel = entry.path().strip_prefix(root)?;
 		f(root, rel)?;
-	};
+	}
 
 	Ok(())
 }
 
 fn iterate_files<F>(path: &Path, f: &mut F) -> Result
-	where F: FnMut(&Path, &Path) -> Result
+where
+	F: FnMut(&Path, &Path) -> Result,
 {
 	if path.join(".update_timestamp").exists() {
 		log!(2; ".update_timestamp exists in {}", path.display());
@@ -39,7 +42,7 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
 				iterate_files(&dependency?.path(), f)?;
-			};
+			}
 		};
 		let src = &path.join("src");
 		if src.exists() {
@@ -54,8 +57,13 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
 			static ref OUTPUT_RE: Regex = Regex::new(r#"output_dir\s*=\s*"(.*?)""#).unwrap();
 		}
-		let modsettings = &String::from_utf8(File::open(path.join("mod.settings"))?.bytes().map(|b| b.unwrap()).collect())?;
-		let mut found  = false;
+		let modsettings = &String::from_utf8(
+			File::open(path.join("mod.settings"))?
+				.bytes()
+				.map(|b| b.unwrap())
+				.collect(),
+		)?;
+		let mut found = false;
 		let mut source = None;
 		if let Some(captures) = SOURCE_RE.captures(modsettings) {
 			let s = path.join(&captures[1]);
@@ -75,21 +83,18 @@ fn iterate_files<F>(path: &Path, f: &mut F) -> Result
 		if !found {
 			elog!("Found no source directory in {}", path.display());
 		};
-	} else { // just guess
+	} else {
+		// just guess
 		log!(2; "Guessing source directory in {}", path.display());
 		let mut found = false;
-		for source_dir in [
-			"source",
-			"output",
-			"src",
-		].iter() {
+		for source_dir in ["source", "output", "src"].iter() {
 			let source_dir = &path.join(source_dir);
 			if source_dir.exists() {
 				found = true;
 				log!(2; "Found {} in {}", source_dir.display(), path.display());
 				iterate_dir(source_dir, f)?;
 			};
-		};
+		}
 		if !found {
 			iterate_dir(path, f)?;
 		};
@@ -111,7 +116,9 @@ pub fn main() -> Result {
 		let dir = Temp::new_in(".");
 		fs::rename(dst, &dir).unwrap();
 		Some(dir)
-	} else {None};
+	} else {
+		None
+	};
 	fs::create_dir(dst)?;
 
 	let mut builder = Builder::new(dst.to_path_buf(), old.map(|o| o.to_path_buf()));
@@ -121,9 +128,8 @@ pub fn main() -> Result {
 		let src = root.join(path);
 		if src.is_dir() {
 			log!(2; "DIRECTORY {}", path.display());
-			fs::create_dir_all(dst).with_context(|_| {
-				format!("Could not create directory {}", path.display())
-			})?;
+			fs::create_dir_all(dst)
+				.with_context(|_| format!("Could not create directory {}", path.display()))?;
 		} else {
 			log!(2; "{}: {}", root.display(), path.display());
 			builder.build(&src, path)?;

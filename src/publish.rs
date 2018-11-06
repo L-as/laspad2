@@ -1,25 +1,25 @@
-use std::path::{Path, PathBuf};
-use std::fs;
-use std::io::{Write, Cursor};
-use std::result::Result as StdResult;
 use failure::*;
-use zip;
 use git2::Repository;
+use std::{
+	fs,
+	io::{Cursor, Write},
+	path::{Path, PathBuf},
+	result::Result as StdResult,
+};
+use zip;
 
-use steam::{GeneralError as SteamError, self};
-use update;
-use compile;
 use common;
+use compile;
 use config;
+use steam::{self, GeneralError as SteamError};
+use update;
 
 #[derive(Debug, Fail)]
 pub enum PublishError {
 	#[fail(display = "Could not publish dummy file to steam")]
 	DummyFile,
 	#[fail(display = "Branch {} does not exist", branch)]
-	NonexistentBranch {
-		branch: String
-	},
+	NonexistentBranch { branch: String },
 	#[fail(display = "Could not upload zip file to remote storage")]
 	CantUploadMod,
 	#[fail(display = "Could not upload preview to remote storage")]
@@ -30,16 +30,17 @@ pub enum PublishError {
 
 type Result<T> = ::std::result::Result<T, Error>;
 
-fn create_workshop_item(remote: &mut steam::RemoteStorage, utils: &mut steam::Utils) -> Result<steam::Item> {
-	ensure!(remote.file_write("laspad_mod.zip", &[0 as u8]).is_ok(), PublishError::DummyFile);
-
-	let apicall = remote.publish_workshop_file(
-		"laspad_mod.zip",
-		"laspad_mod.zip",
-		"dummy",
-		"dummy",
-		&[]
+fn create_workshop_item(
+	remote: &mut steam::RemoteStorage,
+	utils: &mut steam::Utils,
+) -> Result<steam::Item> {
+	ensure!(
+		remote.file_write("laspad_mod.zip", &[0 as u8]).is_ok(),
+		PublishError::DummyFile
 	);
+
+	let apicall =
+		remote.publish_workshop_file("laspad_mod.zip", "laspad_mod.zip", "dummy", "dummy", &[]);
 
 	let result = utils.get_apicall_result::<steam::PublishItemResult>(apicall);
 
@@ -50,23 +51,32 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	common::find_project()?;
 
 	let config = config::get()?;
-	ensure!(config.contains(branch_name), PublishError::NonexistentBranch { branch: branch_name.to_owned() });
+	ensure!(
+		config.contains(branch_name),
+		PublishError::NonexistentBranch {
+			branch: branch_name.to_owned(),
+		}
+	);
 
 	log!(2; "Connecting to steam process");
-	let client     = steam::Client::new()?;
+	let client = steam::Client::new()?;
 	log!(2; "Accessing Remote Storage API");
 	let mut remote = client.remote_storage()?;
 	log!(2; "Accessing Utils API");
-	let mut utils  = client.utils()?;
+	let mut utils = client.utils()?;
 
 	log!(2; "Finding mod id for branch");
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
-		steam::Item(u64::from_str_radix(&fs::read_to_string(&modid_file).context("Could not read the modid file")?, 16)?)
+		steam::Item(u64::from_str_radix(
+			&fs::read_to_string(&modid_file).context("Could not read the modid file")?,
+			16,
+		)?)
 	} else {
 		let item = create_workshop_item(&mut remote, &mut utils)?;
 		log!(1; "Created Mod ID: {:X}", item.0);
-		fs::write(&modid_file, format!("{:X}", item.0).as_bytes()).context("Could not create modid file, next publish will create a new mod!")?;
+		fs::write(&modid_file, format!("{:X}", item.0).as_bytes())
+			.context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
 	log!(2; "Mod ID: {:X}", item.0);
@@ -81,12 +91,14 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		use walkdir::WalkDir;
 
 		let mut cursor = Cursor::new(zip);
-		let mut zip    = zip::ZipWriter::new(cursor);
+		let mut zip = zip::ZipWriter::new(cursor);
 
-		let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+		let options =
+			zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
 		zip.start_file(".modinfo", options)?;
-		zip.write_all(format!("name = \"{}\"", branch.name()?).as_bytes()).expect("Could not write to zip archive!");
+		zip.write_all(format!("name = \"{}\"", branch.name()?).as_bytes())
+			.expect("Could not write to zip archive!");
 
 		compile::main()?;
 		for entry in WalkDir::new("compiled").follow_links(true) {
@@ -95,10 +107,19 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 			if entry.is_file() {
 				let rel = entry.strip_prefix("compiled")?;
 				log!(2; "{} < {}", rel.display(), entry.display());
-				zip.start_file(rel.to_str().unwrap().clone().chars().map(|c|if cfg!(windows) && c=='\\'{'/'} else {c}).collect::<String>(), options)?;
-				zip.write_all(&fs::read(entry)?).expect("Could not write to zip archive!");
+				zip.start_file(
+					rel.to_str()
+						.unwrap()
+						.clone()
+						.chars()
+						.map(|c| if cfg!(windows) && c == '\\' { '/' } else { c })
+						.collect::<String>(),
+					options,
+				)?;
+				zip.write_all(&fs::read(entry)?)
+					.expect("Could not write to zip archive!");
 			}
-		};
+		}
 
 		zip.finish()?.into_inner()
 	};
@@ -109,7 +130,10 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	};
 
 	log!(1; "Uploading preview");
-	if remote.file_write("laspad_preview", &branch.preview()?).is_err() {
+	if remote
+		.file_write("laspad_preview", &branch.preview()?)
+		.is_err()
+	{
 		bail!(PublishError::CantUploadPreview);
 	};
 
@@ -119,7 +143,9 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		if u.title(&branch.name()?).is_err() {
 			elog!("Could not update title");
 		};
-		if u.tags(&branch.tags()?.iter().map(|s| &**s).collect::<Vec<_>>()).is_err() {
+		if u.tags(&branch.tags()?.iter().map(|s| &**s).collect::<Vec<_>>())
+			.is_err()
+		{
 			elog!("Could not update tags");
 		};
 		if u.description(&branch.description()?).is_err() {
@@ -135,7 +161,9 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 			let repo = Repository::open(".").expect("Could not open git repo!");
 			let head = repo.head()?;
 			let oid = head.peel_to_commit()?.id();
-			if u.change_description(&format!("git commit: {}", oid)).is_err() {
+			if u.change_description(&format!("git commit: {}", oid))
+				.is_err()
+			{
 				elog!("Could not update version history");
 			};
 		};
@@ -154,15 +182,17 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	if retry {
 		while let Err(e) = request_update() {
 			match e.downcast::<SteamError>() {
-				Ok(e) => if e == SteamError::Busy {
-					use std::{thread::sleep, time::Duration};
-					sleep(Duration::from_secs(5));
-				} else {
-					bail!(e);
+				Ok(e) => {
+					if e == SteamError::Busy {
+						use std::{thread::sleep, time::Duration};
+						sleep(Duration::from_secs(5));
+					} else {
+						bail!(e);
+					}
 				},
 				Err(e) => bail!(e),
 			};
-		};
+		}
 	} else {
 		request_update()?;
 	};

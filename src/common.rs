@@ -1,8 +1,8 @@
-use std::{
-	path::{Path, PathBuf},
-	env
-};
 use failure::*;
+use std::{
+	env,
+	path::{Path, PathBuf},
+};
 
 pub fn find_project() -> Result<(), Error> {
 	while !is_laspad_project(".") {
@@ -11,7 +11,7 @@ pub fn find_project() -> Result<(), Error> {
 		} else {
 			bail!("This is not a laspad project!");
 		};
-	};
+	}
 	Ok(())
 }
 
@@ -22,7 +22,8 @@ pub fn get_ns2() -> PathBuf {
 
 #[cfg(not(windows))]
 pub fn get_ns2() -> PathBuf {
-	Path::new(&env::var_os("HOME").unwrap()).join(".local/share/Steam/steamapps/common/Natural Selection 2/x64")
+	Path::new(&env::var_os("HOME").unwrap())
+		.join(".local/share/Steam/steamapps/common/Natural Selection 2/x64")
 }
 
 pub fn is_laspad_project<P: AsRef<Path>>(path: P) -> bool {

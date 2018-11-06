@@ -1,16 +1,11 @@
-use std::{
-	path::Path,
-	fs,
-	ffi::OsStr,
-	borrow::Cow,
-};
+use std::{borrow::Cow, ffi::OsStr, fs, path::Path};
 
-use git2::Repository;
 use failure::*;
+use git2::Repository;
 use toml;
 
-use steam;
 use md_to_bb;
+use steam;
 
 type Result<T> = ::std::result::Result<T, Error>;
 
@@ -41,11 +36,13 @@ impl<'a> Config {
 			},
 		}
 	}
+
 	pub fn contains(&self, key: &str) -> bool {
 		match self.0 {
 			ConfigKind::TOML(ref table) => table.contains_key(key),
 		}
 	}
+
 	pub fn get(&'a self, key: &str, item: steam::Item) -> Result<Option<Branch>> {
 		log!(2; "Accessed branch {}", key);
 		match self.0 {
@@ -53,7 +50,7 @@ impl<'a> Config {
 				let v: TOMLBranch = if let Some(v) = table.get(key) {
 					v.clone().try_into()?
 				} else {
-					return Ok(None)
+					return Ok(None);
 				};
 				Ok(Some(Branch(BranchKind::TOML(v), item)))
 			},
@@ -64,26 +61,31 @@ impl<'a> Config {
 impl Branch {
 	pub fn name(&self) -> Result<Cow<str>> {
 		match self.0 {
-			BranchKind::TOML(ref branch)        => Ok(Cow::Borrowed(&branch.name)),
+			BranchKind::TOML(ref branch) => Ok(Cow::Borrowed(&branch.name)),
 		}
 	}
+
 	pub fn tags(&self) -> Result<Cow<[String]>> {
 		match self.0 {
-			BranchKind::TOML(ref branch)        => Ok(Cow::Borrowed(&branch.tags)),
+			BranchKind::TOML(ref branch) => Ok(Cow::Borrowed(&branch.tags)),
 		}
 	}
+
 	pub fn description(&self) -> Result<String> {
 		match self.0 {
-			BranchKind::TOML(ref toml)           => read_description(
+			BranchKind::TOML(ref toml) => read_description(
 				toml.description.as_ref().map(|s| s.as_ref()),
 				toml.autodescription.unwrap_or(false),
 				toml.website.as_ref().map(|s| s.as_ref()),
-				self.1),
+				self.1,
+			),
 		}
 	}
+
 	pub fn preview(&self) -> Result<Vec<u8>> {
 		fn default(mut v: Vec<u8>) -> Vec<u8> {
-			if v.len() == 0 { // Steam craps itself when it has 0 length
+			if v.len() == 0 {
+				// Steam craps itself when it has 0 length
 				v.extend_from_slice(b"\x89PNG\r\n\x1A\n"); // PNG header so that it shows an empty image in browsers instead of an error
 			};
 			v
@@ -101,7 +103,12 @@ impl Branch {
 	}
 }
 
-fn read_description(path: Option<&Path>, auto_description: bool, website: Option<&str>, item: steam::Item) -> Result<String> {
+fn read_description(
+	path: Option<&Path>,
+	auto_description: bool,
+	website: Option<&str>,
+	item: steam::Item,
+) -> Result<String> {
 	let description = match path {
 		Some(path) => {
 			let description = fs::read_to_string(path).context("Could not read description")?;
@@ -126,15 +133,12 @@ fn read_description(path: Option<&Path>, auto_description: bool, website: Option
 }
 
 fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<String> {
-	let mut s: String = format!(
-		"[b]Mod ID: {:X}[/b]\n\n",
-		item.0
-	);
+	let mut s: String = format!("[b]Mod ID: {:X}[/b]\n\n", item.0);
 
 	if Path::new(".git").exists() && website.is_some() {
 		let repo = Repository::open(".")?;
-		let head   = repo.head()?;
-		let oid    = head.peel_to_commit()?.id();
+		let head = repo.head()?;
+		let oid = head.peel_to_commit()?.id();
 		s.push_str(&format!(
 			"[b][url={}]git repository[/url][/b]\ncurrent git commit: {}\n\n",
 			website.unwrap(),
@@ -149,37 +153,39 @@ fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<
 
 	if Path::new("dependencies").exists() {
 		s.push_str("Mods included: [list]\n");
-		for dependency in fs::read_dir("dependencies").context("Couldn't read dependencies directory")? {
+		for dependency in
+			fs::read_dir("dependencies").context("Couldn't read dependencies directory")?
+		{
 			let dependency = dependency?;
-			let path       = dependency.path();
-			let name       = dependency.file_name().into_string().expect("Invalid UTF-8");
+			let path = dependency.path();
+			let name = dependency.file_name().into_string().expect("Invalid UTF-8");
 			let (name, url) = if let Ok(modid) = u64::from_str_radix(&name, 16) {
 				#[derive(Deserialize)]
 				struct ModInfo {
-					name: Box<str>
+					name: Box<str>,
 				}
 
-				let s = fs::read_to_string(path.join(".modinfo")).with_context(|_| format!("Couldn't read .modinfo file for {}", &name))?;
+				let s = fs::read_to_string(path.join(".modinfo"))
+					.with_context(|_| format!("Couldn't read .modinfo file for {}", &name))?;
 				let modinfo: ModInfo = toml::from_str(&s)?;
 
-				let url = format!("http://steamcommunity.com/sharedfiles/filedetails/?id={}", modid);
+				let url = format!(
+					"http://steamcommunity.com/sharedfiles/filedetails/?id={}",
+					modid
+				);
 
 				(modinfo.name, url.into_boxed_str())
 			} else if path.join(".git").exists() {
-				let repo   = Repository::open(path)?;
+				let repo = Repository::open(path)?;
 				let origin = repo.find_remote("origin")?;
-				let url    = origin.url().unwrap();
+				let url = origin.url().unwrap();
 
 				(name.into_boxed_str(), String::from(url).into_boxed_str())
 			} else {
-				continue
+				continue;
 			};
-			s.push_str(&format!(
-				"  [*] [url={}]{}[/url]\n",
-				url,
-				name
-			));
-		};
+			s.push_str(&format!("  [*] [url={}]{}[/url]\n", url, name));
+		}
 		s.push_str("[/list]\n\n");
 	};
 

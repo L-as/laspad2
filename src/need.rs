@@ -1,7 +1,9 @@
-use std::fs::{self, File, OpenOptions};
-use std::io::Write;
-use std::path::{PathBuf, Path};
 use failure::*;
+use std::{
+	fs::{self, File, OpenOptions},
+	io::Write,
+	path::{Path, PathBuf},
+};
 
 use common;
 
@@ -18,7 +20,10 @@ type Result = ::std::result::Result<(), Error>;
 pub fn main(dep: &str) -> Result {
 	common::find_project()?;
 
-	ensure!(u64::from_str_radix(dep, 16).is_ok(), NeedError::InvalidModId);
+	ensure!(
+		u64::from_str_radix(dep, 16).is_ok(),
+		NeedError::InvalidModId
+	);
 
 	fs::create_dir_all("dependencies")?;
 
@@ -35,7 +40,13 @@ pub fn main(dep: &str) -> Result {
 			.create(true)
 			.append(true)
 			.open(".gitignore")?
-			.write_all(format!("/dependencies/{}/*\n!/dependencies/{}/.laspad_dummy\n", dep, dep).as_bytes())?;
+			.write_all(
+				format!(
+					"/dependencies/{}/*\n!/dependencies/{}/.laspad_dummy\n",
+					dep, dep
+				)
+				.as_bytes(),
+			)?;
 	};
 
 	log!("Added {} as dependency; NB: Contents are not downloaded automatically: you must update first!", dep);
