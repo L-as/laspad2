@@ -12,7 +12,7 @@ pub fn zip<T: Write + Seek>(branch_name: &str, out: T) -> Fallible<T> {
 	let config = config::get()?;
 	let branch = config.get(branch_name)?.unwrap();
 
-	log!(1; "Zipping up files");
+	debug!("Zipping up files");
 
 	let mut out = ZipWriter::new(out);
 
@@ -29,7 +29,7 @@ pub fn zip<T: Write + Seek>(branch_name: &str, out: T) -> Fallible<T> {
 		let entry = entry.path();
 		if entry.is_file() {
 			let rel = entry.strip_prefix("compiled")?;
-			log!(2; "{} < {}", rel.display(), entry.display());
+			trace!("{} < {}", rel.display(), entry.display());
 			out.start_file(
 				rel.to_str()
 					.unwrap()

@@ -75,7 +75,10 @@ pub fn specific<P: AsRef<Path>>(item: Item, path: P) -> Result<()> {
 
 	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
 	if local_update < remote_update {
-		log!(1; "Local workshop item {:8X} copy is outdated, {} < {}", item.0, local_update, remote_update);
+		info!(
+			"Local workshop item {:8X} copy is outdated, {} < {}",
+			item.0, local_update, remote_update
+		);
 		for entry in fs::read_dir(path)? {
 			let entry = &entry?.path();
 			if entry
@@ -111,7 +114,7 @@ pub fn specific<P: AsRef<Path>>(item: Item, path: P) -> Result<()> {
 		}
 		File::create(path.join(".update_timestamp"))?.write_u64::<LE>(remote_update)?;
 	} else {
-		log!(1; "Local workshop item {:8X} copy is up-to-date", item.0);
+		debug!("Local workshop item {:8X} copy is up-to-date", item.0);
 	};
 
 	Ok(())
@@ -127,12 +130,12 @@ pub fn main() -> Result<()> {
 			if let Ok(modid) = u64::from_str_radix(path.file_name().unwrap().to_str().unwrap(), 16)
 			{
 				if let Err(e) = specific(Item(modid), path) {
-					elog!("Could not update {:X}: {}", modid, e);
+					warn!("Could not update {:X}: {}", modid, e);
 				};
 			};
 		}
 	};
 
-	log!("Finished updating");
+	debug!("Finished updating");
 	Ok(())
 }

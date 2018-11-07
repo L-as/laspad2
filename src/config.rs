@@ -43,7 +43,7 @@ impl<'a> Config {
 	}
 
 	pub fn get(&'a self, key: &str) -> Result<Option<Branch>> {
-		log!(2; "Accessed branch {}", key);
+		trace!("Accessed branch {}", key);
 		match self.0 {
 			ConfigKind::TOML(ref table) => {
 				let v: TOMLBranch = if let Some(v) = table.get(key) {
@@ -192,7 +192,7 @@ fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<
 }
 
 pub fn get() -> Result<Config> {
-	log!(2; "Reading laspad.toml");
+	trace!("Reading laspad.toml");
 	let toml: toml::Value = fs::read_to_string("laspad.toml")?.parse()?;
 	let toml = if let toml::Value::Table(t) = toml {
 		t

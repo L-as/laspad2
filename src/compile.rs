@@ -33,10 +33,10 @@ where
 	F: FnMut(&Path, &Path) -> Result,
 {
 	if path.join(".update_timestamp").exists() {
-		log!(2; ".update_timestamp exists in {}", path.display());
+		debug!(".update_timestamp exists in {}", path.display());
 		iterate_dir(path, f)?;
 	} else if common::is_laspad_project(path) {
-		log!(2; "laspad project exists in {}", path.display());
+		debug!("laspad project exists in {}", path.display());
 		let dependencies = &path.join("dependencies");
 		if dependencies.exists() {
 			for dependency in fs::read_dir(dependencies)? {
@@ -47,10 +47,10 @@ where
 		if src.exists() {
 			iterate_dir(src, f)?;
 		} else {
-			elog!(1; "Found no source directory in {}", path.display());
+			warn!("Found no source directory in {}", path.display());
 		};
 	} else if path.join("mod.settings").exists() {
-		log!(2; "mod.settings exists in {}", path.display());
+		debug!("mod.settings exists in {}", path.display());
 		use regex::Regex;
 		lazy_static! {
 			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
@@ -80,17 +80,17 @@ where
 			};
 		};
 		if !found {
-			elog!("Found no source directory in {}", path.display());
+			warn!("Found no source directory in {}", path.display());
 		};
 	} else {
 		// just guess
-		log!(2; "Guessing source directory in {}", path.display());
+		debug!("Guessing source directory in {}", path.display());
 		let mut found = false;
 		for source_dir in ["source", "output", "src"].iter() {
 			let source_dir = &path.join(source_dir);
 			if source_dir.exists() {
 				found = true;
-				log!(2; "Found {} in {}", source_dir.display(), path.display());
+				trace!("Found {} in {}", source_dir.display(), path.display());
 				iterate_dir(source_dir, f)?;
 			};
 		}
@@ -110,11 +110,11 @@ pub fn main() -> Result {
 		let dst = &dst.join(path);
 		let src = root.join(path);
 		if src.is_dir() {
-			log!(2; "DIRECTORY {}", path.display());
+			trace!("DIRECTORY {}", path.display());
 			fs::create_dir_all(dst)
 				.with_context(|_| format!("Could not create directory {}", path.display()))?;
 		} else {
-			log!(2; "{}: {}", root.display(), path.display());
+			trace!("{}: {}", root.display(), path.display());
 			if dst.exists() {
 				fs::remove_file(dst)?
 			};

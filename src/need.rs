@@ -49,6 +49,6 @@ pub fn main(dep: &str) -> Result {
 			)?;
 	};
 
-	log!("Added {} as dependency; NB: Contents are not downloaded automatically: you must update first!", dep);
+	println!("Added {} as dependency; NB: Contents are not downloaded automatically: you must update first!", dep);
 	Ok(())
 }

@@ -4,14 +4,11 @@
 #![deny(unused_must_use)]
 
 #[macro_use]
+extern crate log;
+#[macro_use]
 extern crate failure;
 #[macro_use]
-extern crate downcast;
-#[macro_use]
 extern crate indoc;
-
-#[macro_use]
-mod logger;
 
 mod common;
 mod config;
@@ -29,44 +26,14 @@ mod publish;
 mod update;
 
 use clap::{clap_app, crate_version};
-use std::{env, io::Write, process::exit, str::FromStr};
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
-
-use crate::logger::Log;
-
-struct StdLog {
-	stdout: StandardStream,
-	stderr: StandardStream,
-}
-
-impl Log for StdLog {
-	fn write(&mut self, priority: i64, line: &str) {
-		if priority > 0 {
-			let _ = self
-				.stderr
-				.set_color(ColorSpec::new().set_fg(Some(Color::Red)));
-			let _ = writeln!(self.stderr, "{}", line);
-			let _ = self.stderr.reset();
-		} else if priority == 0 {
-			let _ = self.stdout.set_color(ColorSpec::new().set_bold(true));
-			let _ = writeln!(self.stdout, "{}", line);
-			let _ = self.stdout.reset();
-		} else {
-			let _ = writeln!(self.stdout, "{}", line);
-		};
-	}
-}
+use std::{process::exit, str::FromStr};
 
 fn main() {
-	if env::var_os("RUST_LOG").is_none() {
-		env::set_var("RUST_LOG", "laspad=info")
-	};
-
 	let matches = clap_app!(laspad =>
 		(version: crate_version!())
 		(author:  "las <las@protonmail.ch>")
 		(about:   "Replacement of Launch Pad for Natural Selection 2, i.e. can publish mods to workshop.")
-		(@arg VERBOSITY: -v +multiple "Sets verbosity, use multiple times to increase verbosity.")
+		(@arg LOGLEVEL: -l --log +case_insensitive possible_value[off error warn info debug trace] "Sets the logging level")
 		//(@setting SubcommandRequiredElseHelp)
 		(@setting VersionlessSubcommands)
 		(@subcommand init =>
@@ -120,26 +87,34 @@ fn main() {
 		)
 	).get_matches();
 
-	logger::set_priority(-(matches.occurrences_of("VERBOSITY") as i64 + 1));
-
-	let log = StdLog {
-		stdout: StandardStream::stdout(ColorChoice::Auto),
-		stderr: StandardStream::stderr(ColorChoice::Auto),
-	};
-
-	logger::set(Box::new(log));
-
 	if let Err(e) = execute_command(&matches) {
 		if cfg!(debug_assertions) {
-			elog!("Fatal error: {:?}", e);
+			eprintln!("Fatal error: {:?}", e);
 		} else {
-			elog!("Fatal error: {}", e);
+			eprintln!("Fatal error: {}", e);
 		};
 		exit(1);
 	};
 }
 
 fn execute_command<'a>(matches: &clap::ArgMatches<'a>) -> Result<(), failure::Error> {
+	fern::Dispatch::new()
+		.format(|out, message, record| {
+			out.finish(format_args!(
+				"[{}][{}] {}",
+				record.target(),
+				record.level(),
+				message
+			))
+		})
+		.level(
+			matches
+				.value_of("LOGLEVEL")
+				.map_or(log::LevelFilter::Info, |s| s.parse().unwrap()),
+		)
+		.chain(std::io::stderr())
+		.apply()?;
+
 	match matches.subcommand() {
 		("", None) => unimplemented!("UI is unimplemented!"),
 		("init", None) => init::main(),

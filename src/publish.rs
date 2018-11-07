@@ -59,14 +59,13 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		}
 	);
 
-	log!(2; "Connecting to steam process");
+	debug!("Connecting to steam process");
 	let client = steam::Client::new()?;
-	log!(2; "Accessing Remote Storage API");
+	debug!("Accessing Remote Storage API");
 	let mut remote = client.remote_storage()?;
-	log!(2; "Accessing Utils API");
+	debug!("Accessing Utils API");
 	let mut utils = client.utils()?;
 
-	log!(2; "Finding mod id for branch");
 	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
 	let item = if modid_file.exists() {
 		steam::Item(u64::from_str_radix(
@@ -75,12 +74,12 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		)?)
 	} else {
 		let item = create_workshop_item(&mut remote, &mut utils)?;
-		log!(1; "Created Mod ID: {:X}", item.0);
+		info!("Created Mod ID: {:X}", item.0);
 		fs::write(&modid_file, format!("{:X}", item.0).as_bytes())
 			.context("Could not create modid file, next publish will create a new mod!")?;
 		item
 	};
-	log!(2; "Mod ID: {:X}", item.0);
+	debug!("Mod ID: {:X}", item.0);
 
 	let branch = config.get(branch_name)?.unwrap();
 
@@ -88,12 +87,12 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 
 	let zip = package::zip(branch_name, Cursor::new(Vec::new()))?.into_inner();
 
-	log!(1; "Uploading zip");
+	debug!("Uploading zip");
 	if remote.file_write("laspad_mod.zip", &zip).is_err() {
 		bail!(PublishError::CantUploadMod);
 	};
 
-	log!(1; "Uploading preview");
+	debug!("Uploading preview");
 	if remote
 		.file_write("laspad_preview", &branch.preview()?)
 		.is_err()
@@ -102,21 +101,21 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	};
 
 	let mut request_update = || {
-		log!(1; "Requesting workshop item update");
+		debug!("Requesting workshop item update");
 		let u = remote.update_workshop_file(item);
 		if u.title(&branch.name()?).is_err() {
-			elog!("Could not update title");
+			error!("Could not update title");
 		};
 		if u.tags(&branch.tags()?.iter().map(|s| &**s).collect::<Vec<_>>())
 			.is_err()
 		{
-			elog!("Could not update tags");
+			error!("Could not update tags");
 		};
 		if u.description(&branch.description(item)?).is_err() {
-			elog!("Could not update description");
+			error!("Could not update description");
 		};
 		if u.preview("laspad_preview").is_err() {
-			elog!("Could not update preview");
+			error!("Could not update preview");
 		};
 		if u.contents("laspad_mod.zip").is_err() {
 			bail!(PublishError::CantUpdateMod);
@@ -128,7 +127,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 			if u.change_description(&format!("git commit: {}", oid))
 				.is_err()
 			{
-				elog!("Could not update version history");
+				error!("Could not update version history");
 			};
 		};
 		let apicall = u.commit();
@@ -137,7 +136,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 
 		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item));
 		if let Ok(item) = result {
-			log!("Published mod: {:X}", item.0);
+			println!("Published mod: {:X}", item.0);
 		};
 
 		Ok(result?)

@@ -20,7 +20,7 @@ pub fn main() -> Result {
 
 	File::create("laspad.toml")?.write_all(include_bytes!("../laspad.toml"))?;
 
-	log!(
+	println!(
 		"Example laspad.toml created. Please modify it. (Nothing will work properly if you don't)"
 	);
 
