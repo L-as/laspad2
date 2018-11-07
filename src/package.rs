@@ -10,7 +10,7 @@ use crate::{common, compile, config};
 
 pub fn zip<T: Write + Seek>(branch_name: &str, out: T) -> Fallible<T> {
 	let config = config::get()?;
-	let branch = config.get(branch_name, crate::steam::Item(0))?.unwrap();
+	let branch = config.get(branch_name)?.unwrap();
 
 	log!(1; "Zipping up files");
 

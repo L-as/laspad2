@@ -82,7 +82,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 	};
 	log!(2; "Mod ID: {:X}", item.0);
 
-	let branch = config.get(branch_name, item)?.unwrap();
+	let branch = config.get(branch_name)?.unwrap();
 
 	update::main()?;
 
@@ -112,7 +112,7 @@ pub fn main(branch_name: &str, retry: bool) -> Result<()> {
 		{
 			elog!("Could not update tags");
 		};
-		if u.description(&branch.description()?).is_err() {
+		if u.description(&branch.description(item)?).is_err() {
 			elog!("Could not update description");
 		};
 		if u.preview("laspad_preview").is_err() {

@@ -25,7 +25,7 @@ enum BranchKind {
 	TOML(TOMLBranch),
 }
 
-pub struct Branch(BranchKind, steam::Item);
+pub struct Branch(BranchKind);
 pub struct Config(ConfigKind);
 impl<'a> Config {
 	pub fn branches(&'a self) -> Result<Vec<Cow<'a, str>>> {
@@ -42,7 +42,7 @@ impl<'a> Config {
 		}
 	}
 
-	pub fn get(&'a self, key: &str, item: steam::Item) -> Result<Option<Branch>> {
+	pub fn get(&'a self, key: &str) -> Result<Option<Branch>> {
 		log!(2; "Accessed branch {}", key);
 		match self.0 {
 			ConfigKind::TOML(ref table) => {
@@ -51,7 +51,7 @@ impl<'a> Config {
 				} else {
 					return Ok(None);
 				};
-				Ok(Some(Branch(BranchKind::TOML(v), item)))
+				Ok(Some(Branch(BranchKind::TOML(v))))
 			},
 		}
 	}
@@ -70,13 +70,13 @@ impl Branch {
 		}
 	}
 
-	pub fn description(&self) -> Result<String> {
+	pub fn description(&self, item: steam::Item) -> Result<String> {
 		match self.0 {
 			BranchKind::TOML(ref toml) => read_description(
 				toml.description.as_ref().map(|s| s.as_ref()),
 				toml.autodescription.unwrap_or(false),
 				toml.website.as_ref().map(|s| s.as_ref()),
-				self.1,
+				item,
 			),
 		}
 	}
