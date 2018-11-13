@@ -1,6 +1,6 @@
 [package]
 name    = "laspad"
-version = "2.0.0-pre6"
+version = "2.0.0-pre7"
 authors = ["Las <las@protonmail.ch>"]
 license = "GPLv3"
 edition = "2018"
@@ -8,21 +8,30 @@ publish = false
 
 [dependencies]
 byteorder         = "1.2.7"
+chrono            = "0.4.6"
 clap              = {version = "2.32"}
+const-cstr        = "0.3"
 curl              = "0.4.18"
-failure           = "0.1.1"
+derive_more       = "0.13"
+either            = "1.5"
+erroneous         = "1"
 fern              = {version = "0.5.6", features = ["colored"]}
-git2              = "0.7.5"
-indoc             = "0.2.8"
+futures           = "0.1.25"
+git2              = "0.8"
+joinery           = "1.2.2"
 lazy_static       = "1.2"
 log               = "0.4.2"
+md_to_bb          = {path = "md_to_bb"}
+rayon             = "1.0.3"
 regex             = "1.0.6"
 serde             = "1.0.80"
 serde_derive      = "1.0.80"
-serde-xml-rs      = "0.2.1"
+serde-xml-rs      = "0.3"
+static_lua        = {path = "static_lua"}
+steam             = {git = "https://github.com/Laaas/easy-steamworks", package = "easy-steamworks"}
 toml              = "0.4.8"
 walkdir           = "2.2.6"
-zip               = "0.4.2"
+zip               = "0.5"
 
 [build-dependencies]
 curl              = "0.4.18"

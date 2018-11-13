@@ -1,203 +1,247 @@
-use failure::*;
-use git2::Repository;
+use derive_more::{Display, From};
+use erroneous::Error as EError;
+use joinery::Joinable;
 use serde_derive::Deserialize;
-use std::{borrow::Cow, ffi::OsStr, fs, path::Path};
+use std::{
+	borrow::Cow,
+	collections::HashMap,
+	ffi::OsStr,
+	fs,
+	io,
+	path::{Path, PathBuf},
+	str::FromStr,
+};
 use toml;
 
-use crate::{md_to_bb, steam};
-
-type Result<T> = ::std::result::Result<T, Error>;
+use crate::{item::Item, project::Project, util};
 
 #[derive(Deserialize)]
-struct TOMLBranch {
-	name:            String,
-	tags:            Vec<String>,
-	autodescription: Option<bool>,
-	description:     Option<String>,
-	preview:         Option<String>,
-	website:         Option<String>,
+pub struct Branch {
+	pub name:            String,
+	pub tags:            Vec<String>,
+	pub autodescription: Option<bool>,
+	pub description:     Option<PathBuf>,
+	pub description_str: Option<String>,
+	pub preview:         Option<PathBuf>,
+	pub website:         Option<String>,
+	pub item:            Option<Item>,
 }
 
-enum ConfigKind {
-	TOML(toml::value::Table),
-}
-enum BranchKind {
-	TOML(TOMLBranch),
-}
-
-pub struct Branch(BranchKind);
-pub struct Config(ConfigKind);
-impl<'a> Config {
-	pub fn branches(&'a self) -> Result<Vec<Cow<'a, str>>> {
-		match self.0 {
-			ConfigKind::TOML(ref table) => {
-				Ok(table.keys().map(|s| Cow::Borrowed(s.as_str())).collect())
-			},
-		}
-	}
-
-	pub fn contains(&self, key: &str) -> bool {
-		match self.0 {
-			ConfigKind::TOML(ref table) => table.contains_key(key),
-		}
-	}
-
-	pub fn get(&'a self, key: &str) -> Result<Option<Branch>> {
-		trace!("Accessed branch {}", key);
-		match self.0 {
-			ConfigKind::TOML(ref table) => {
-				let v: TOMLBranch = if let Some(v) = table.get(key) {
-					v.clone().try_into()?
-				} else {
-					return Ok(None);
-				};
-				Ok(Some(Branch(BranchKind::TOML(v))))
-			},
-		}
-	}
+#[derive(Debug, Display, EError, From)]
+pub enum DescriptionError {
+	#[display(fmt = "{}", _0)]
+	ReadError(#[error(defer)] util::ReadError),
+	#[display(fmt = "Could not read dependencies")]
+	Dependencies(#[error(source)] io::Error),
 }
 
 impl Branch {
-	pub fn name(&self) -> Result<Cow<'_, str>> {
-		match self.0 {
-			BranchKind::TOML(ref branch) => Ok(Cow::Borrowed(&branch.name)),
-		}
-	}
-
-	pub fn tags(&self) -> Result<Cow<'_, [String]>> {
-		match self.0 {
-			BranchKind::TOML(ref branch) => Ok(Cow::Borrowed(&branch.tags)),
-		}
-	}
-
-	pub fn description(&self, item: steam::Item) -> Result<String> {
-		match self.0 {
-			BranchKind::TOML(ref toml) => read_description(
-				toml.description.as_ref().map(|s| s.as_ref()),
-				toml.autodescription.unwrap_or(false),
-				toml.website.as_ref().map(|s| s.as_ref()),
-				item,
-			),
-		}
-	}
-
-	pub fn preview(&self) -> Result<Vec<u8>> {
-		fn default(mut v: Vec<u8>) -> Vec<u8> {
-			if v.len() == 0 {
-				// Steam craps itself when it has 0 length
-				v.extend_from_slice(b"\x89PNG\r\n\x1A\n"); // PNG header so that it shows an empty image in browsers instead of an error
-			};
-			v
-		}
-		match self.0 {
-			BranchKind::TOML(ref branch) => {
-				let preview = if let Some(preview) = branch.preview.as_ref() {
-					fs::read(preview).context("Could not read preview")?
+	pub fn description(&self, project: &Project, item: Item) -> Result<String, DescriptionError> {
+		use self::DescriptionError::*;
+		let description: Cow<str> = match &self.description {
+			Some(path) => {
+				let description = util::read_to_string(project.path.join(path))?;
+				if path.extension() == Some(OsStr::new("md")) {
+					md_to_bb::convert(&description).into()
 				} else {
-					Default::default()
-				};
-				Ok(default(preview))
+					description.into()
+				}
 			},
+			None => self
+				.description_str
+				.as_ref()
+				.map(|s| s.as_ref())
+				.unwrap_or("")
+				.into(),
+		};
+
+		let description = if self.autodescription.unwrap_or(true) {
+			let website: Cow<str> = if let Some(website) = &self.website {
+				if let Some(commit) = project.head() {
+					format!(
+						"[b][url={}]website[/url][/b]\ncurrent git commit: {}\n\n",
+						website, commit
+					)
+				} else {
+					format!("[b][url={}]website[/url][/b]\n\n", website)
+				}
+				.into()
+			} else {
+				"".into()
+			};
+
+			let deps = project.dependencies().map_err(Dependencies)?;
+
+			let deps = if deps.len() > 0 {
+				let deps: Result<Vec<_>, DescriptionError> = deps
+					.into_iter()
+					.map(|d| match d.url() {
+						Some(url) => Ok(Some(format!("  [*] [url={}]{}[/url]\n", url, d.name()?))),
+						None => Ok(None),
+					})
+					.collect();
+
+				let deps = deps?.into_iter().filter_map(|x| x).join_concat();
+
+				format!("Mods included: [list]\n{}[/list]\n\n", deps)
+			} else {
+				"".into()
+			};
+
+			format!(
+				"[b]Mod ID: {item:X}[/b]\n{website}{dependencies}",
+				item = item.0,
+				website = website,
+				dependencies = deps,
+			)
+		} else {
+			description.into()
+		};
+
+		Ok(description)
+	}
+
+	pub fn preview(&self, project: &Project) -> Result<Vec<u8>, io::Error> {
+		self.preview.as_ref().map_or(Ok(Vec::new()), |preview| {
+			fs::read(project.path.join(preview))
+		})
+	}
+}
+
+pub struct Config {
+	pub deps:              Vec<Item>,
+	pub branches:          HashMap<String, Branch>,
+	pub source_output_dir: Option<(PathBuf, PathBuf)>,
+}
+
+#[derive(Debug, Display, EError, From)]
+pub enum ParseError {
+	#[display(fmt = "{} is not a valid version!", _0)]
+	InvalidVersion(i64),
+	#[display(fmt = "Expected key {} of type {}", _0, _1)]
+	ExpectedKey(&'static str, &'static str),
+	#[display(fmt = "Could not parse ")]
+	Error(#[error(source)] toml::de::Error),
+}
+
+#[derive(Debug, Display, EError, From)]
+pub enum TOMLGetError {
+	#[display(fmt = "Could not parse laspad.toml")]
+	ParseError(#[error(source)] ParseError),
+	#[display(fmt = "Could not read laspad.toml")]
+	Read(#[error(source)] io::Error),
+}
+
+#[derive(Debug, Display, EError, From)]
+pub enum LuaGetError {
+	#[display(fmt = "Could not parse mod.settings")]
+	Parse,
+	#[display(fmt = "Could not read mod.settings")]
+	Read(#[error(source)] io::Error),
+	#[display(fmt = "Key '{}' is missing from mod.settings", _0)]
+	MissingKey(&'static str),
+	#[display(fmt = "'publish_id' field has an invalid format! It should be hexadecimal")]
+	InvalidPublishId,
+}
+
+#[derive(Debug, Display, EError, From)]
+pub enum GetError {
+	#[display(fmt = "Could not get laspad.toml")]
+	TOMLGetError(#[error(source)] TOMLGetError),
+	#[display(fmt = "Could not get mod.settings")]
+	LuaGetError(#[error(source)] LuaGetError),
+}
+
+fn parse_mod_settings(path: &Path) -> Result<Option<Config>, LuaGetError> {
+	use self::LuaGetError::*;
+
+	let conf = fs::read_to_string(path.join("mod.settings"));
+	let conf = match conf.as_ref() {
+		Ok(s) => static_lua::parse(s).map_err(|_| Parse)?,
+		Err(ref e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+		Err(_) => return Err(conf.unwrap_err().into()),
+	};
+
+	let mut tags = Vec::new();
+
+	for (k, &v) in &conf {
+		if k.starts_with("tag_") {
+			tags.push(v.into());
+		}
+	}
+
+	let get = move |key: &'static str| conf.get(key).map(|s| *s).ok_or(MissingKey(key));
+
+	let branch = Branch {
+		name: get("name")?.into(),
+		tags,
+		autodescription: Some(false),
+		description: None,
+		description_str: Some(get("description")?.into()),
+		preview: Some(get("image")?.into()),
+		website: None,
+		item: Some(get("publish_id")?.parse().map_err(|_| InvalidPublishId)?),
+	};
+
+	let mut branches = HashMap::new();
+	branches.insert("master".into(), branch);
+
+	Ok(Some(Config {
+		source_output_dir: Some((get("source_dir")?.into(), get("output_dir")?.into())),
+		deps: Vec::new(),
+		branches,
+	}))
+}
+
+impl Config {
+	pub const EXAMPLE: Option<&'static str> = Some(include_str!("../assets/laspad.toml"));
+
+	pub fn get(path: &Path) -> Result<Option<Self>, GetError> {
+		match fs::read_to_string(path.join("laspad.toml")) {
+			Ok(s) => Ok(Some(s.parse().map_err(TOMLGetError::ParseError)?)),
+			Err(ref e) if e.kind() == io::ErrorKind::NotFound => Ok(parse_mod_settings(path)?),
+			Err(e) => Err(TOMLGetError::Read(e).into()),
 		}
 	}
 }
 
-fn read_description(
-	path: Option<&Path>,
-	auto_description: bool,
-	website: Option<&str>,
-	item: steam::Item,
-) -> Result<String> {
-	let description = match path {
-		Some(path) => {
-			let description = fs::read_to_string(path).context("Could not read description")?;
-			if path.extension() == Some(OsStr::new("md")) {
-				md_to_bb::convert(&description)
-			} else {
-				description
-			}
-		},
-		None => Default::default(),
-	};
+impl FromStr for Config {
+	type Err = ParseError;
 
-	let description = if auto_description {
-		let mut s = generate_autodescription(item, website)?;
-		s.push_str(&description);
-		s
-	} else {
-		description
-	};
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		use self::ParseError::*;
 
-	Ok(description)
-}
+		let mut c: HashMap<String, toml::Value> = toml::de::from_str(s)?;
 
-fn generate_autodescription(item: steam::Item, website: Option<&str>) -> Result<String> {
-	let mut s: String = format!("[b]Mod ID: {:X}[/b]\n\n", item.0);
+		let version = c.get("version").and_then(|v| v.as_integer()).map(|v| {
+			c.remove("version");
+			v
+		});
 
-	if Path::new(".git").exists() && website.is_some() {
-		let repo = Repository::open(".")?;
-		let head = repo.head()?;
-		let oid = head.peel_to_commit()?.id();
-		s.push_str(&format!(
-			"[b][url={}]git repository[/url][/b]\ncurrent git commit: {}\n\n",
-			website.unwrap(),
-			oid
-		));
-	} else if website.is_some() {
-		s.push_str(&format!(
-			"[b][url={}]website[/url][/b]\n\n",
-			website.unwrap()
-		));
-	};
-
-	if Path::new("dependencies").exists() {
-		s.push_str("Mods included: [list]\n");
-		for dependency in
-			fs::read_dir("dependencies").context("Couldn't read dependencies directory")?
-		{
-			let dependency = dependency?;
-			let path = dependency.path();
-			let name = dependency.file_name().into_string().expect("Invalid UTF-8");
-			let (name, url) = if let Ok(modid) = u64::from_str_radix(&name, 16) {
-				#[derive(Deserialize)]
-				struct ModInfo {
-					name: Box<str>,
-				}
-
-				let s = fs::read_to_string(path.join(".modinfo"))
-					.with_context(|_| format!("Couldn't read .modinfo file for {}", &name))?;
-				let modinfo: ModInfo = toml::from_str(&s)?;
-
-				let url = format!(
-					"http://steamcommunity.com/sharedfiles/filedetails/?id={}",
-					modid
-				);
-
-				(modinfo.name, url.into_boxed_str())
-			} else if path.join(".git").exists() {
-				let repo = Repository::open(path)?;
-				let origin = repo.find_remote("origin")?;
-				let url = origin.url().unwrap();
-
-				(name.into_boxed_str(), String::from(url).into_boxed_str())
-			} else {
-				continue;
-			};
-			s.push_str(&format!("  [*] [url={}]{}[/url]\n", url, name));
-		}
-		s.push_str("[/list]\n\n");
-	};
-
-	Ok(s)
-}
-
-pub fn get() -> Result<Config> {
-	trace!("Reading laspad.toml");
-	let toml: toml::Value = fs::read_to_string("laspad.toml")?.parse()?;
-	let toml = if let toml::Value::Table(t) = toml {
-		t
-	} else {
-		bail!("The TOML configuration file has to be a table!");
-	};
-	Ok(Config(ConfigKind::TOML(toml)))
+		let c = match version {
+			None | Some(0) => Config {
+				source_output_dir: None,
+				deps:              Vec::new(),
+				branches:          c
+					.into_iter()
+					.map(|(k, v)| -> Result<_, toml::de::Error> {
+						let v = v.try_into()?;
+						Ok((k, v))
+					})
+					.collect::<Result<_, _>>()?,
+			},
+			Some(1) => Config {
+				source_output_dir: None,
+				deps:              c
+					.remove("dependencies")
+					.map_or(Ok(Vec::new()), |d| d.try_into())?,
+				branches:          c
+					.remove("branch")
+					.ok_or(ExpectedKey("branch", "Table"))?
+					.try_into()?,
+			},
+			Some(v) => return Err(InvalidVersion(v)),
+		};
+		Ok(c)
+	}
 }

@@ -1,125 +1,87 @@
-use failure::*;
-use lazy_static::lazy_static;
+use derive_more::{Display, From};
+use erroneous::Error as EError;
 use std::{
-	fs::{self, File},
-	io::Read,
-	path::Path,
+	io,
+	path::{Path, PathBuf},
 };
 use walkdir::WalkDir;
 
-use crate::common;
+use crate::Project;
 
-type Result = ::std::result::Result<(), Error>;
+#[derive(Debug, Display, EError, From)]
+pub enum Error {
+	#[display(fmt = "Could not iterate over files in directory")]
+	WalkDir(#[error(source)] walkdir::Error),
+	#[display(fmt = "Could not create '{}'", "_0.display()")]
+	Create(PathBuf, #[error(source)] io::Error),
+	#[display(fmt = "Could not read dependencies")]
+	Dependencies(#[error(source)] io::Error),
+	#[display(fmt = "Could not compile dependency at '{}'", "_0.display()")]
+	Dependency(PathBuf, #[error(source)] Box<Error>),
+}
 
-fn iterate_dir<F>(root: &Path, f: &mut F) -> Result
-where
-	F: FnMut(&Path, &Path) -> Result,
-{
+pub trait Out {
+	fn file(&mut self, src: &Path, dst: &Path) -> Result<(), io::Error>;
+	fn dir(&mut self, path: &Path) -> Result<(), io::Error>;
+}
+
+fn iterate_dir(root: &Path, out: &mut impl Out) -> Result<(), Error> {
 	for entry in WalkDir::new(root).into_iter().filter_entry(|e| {
 		e.file_name()
 			.to_str()
 			.map_or(true, |s| s.chars().next() != Some('.'))
 	}) {
-		let entry = entry?;
-		let rel = entry.path().strip_prefix(root)?;
-		f(root, rel)?;
+		let src = entry?;
+		let src = src.path();
+		let dst = src.strip_prefix(root).expect("Could not strip prefix of path");
+		if src.is_dir() {
+			out.dir(&dst).map_err(|e| Error::Create(dst.into(), e))?;
+		} else {
+			out.file(&src, &dst)
+				.map_err(|e| Error::Create(dst.into(), e))?;
+		}
 	}
 
 	Ok(())
 }
 
-fn iterate_files<F>(path: &Path, f: &mut F) -> Result
-where
-	F: FnMut(&Path, &Path) -> Result,
-{
-	if path.join(".update_timestamp").exists() {
-		debug!(".update_timestamp exists in {}", path.display());
-		iterate_dir(path, f)?;
-	} else if common::is_laspad_project(path) {
-		debug!("laspad project exists in {}", path.display());
-		let dependencies = &path.join("dependencies");
-		if dependencies.exists() {
-			for dependency in fs::read_dir(dependencies)? {
-				iterate_files(&dependency?.path(), f)?;
-			}
-		};
-		let src = &path.join("src");
-		if src.exists() {
-			iterate_dir(src, f)?;
+pub fn compile(project: &Project, out: &mut impl Out) -> Result<(), Error> {
+	info!("Compiling project at {}", project.path.display());
+	for dep in project.dependencies().map_err(Error::Dependencies)? {
+		if let Ok(Some(project)) = Project::get(&dep.path) {
+			compile(&project, out).map_err(|e| Error::Dependency(dep.path.into(), e.into()))?;
 		} else {
-			warn!("Found no source directory in {}", path.display());
+			let src = ["source", "output", "src"]
+				.iter()
+				.map(|p| dep.path.join(p))
+				.find(|p| p.exists())
+				.unwrap_or(dep.path.clone());
+			info!("Compiling mod in {}", src.display());
+			iterate_dir(&src, out)?;
 		};
-	} else if path.join("mod.settings").exists() {
-		debug!("mod.settings exists in {}", path.display());
-		use regex::Regex;
-		lazy_static! {
-			static ref SOURCE_RE: Regex = Regex::new(r#"source_dir\s*=\s*"(.*?)""#).unwrap();
-			static ref OUTPUT_RE: Regex = Regex::new(r#"output_dir\s*=\s*"(.*?)""#).unwrap();
-		}
-		let modsettings = &String::from_utf8(
-			File::open(path.join("mod.settings"))?
-				.bytes()
-				.map(|b| b.unwrap())
-				.collect(),
-		)?;
-		let mut found = false;
-		let mut source = None;
-		if let Some(captures) = SOURCE_RE.captures(modsettings) {
-			let s = path.join(&captures[1]);
-			if s.exists() {
-				found = true;
-				iterate_dir(&s, f)?;
-			};
-			source = Some(s.clone());
-		};
-		if let Some(captures) = OUTPUT_RE.captures(modsettings) {
-			let s = path.join(&captures[1]);
-			if s.exists() && (source.is_none() || &s != &source.unwrap()) {
-				found = true;
-				iterate_dir(&s, f)?;
-			};
-		};
-		if !found {
-			warn!("Found no source directory in {}", path.display());
-		};
-	} else {
-		// just guess
-		debug!("Guessing source directory in {}", path.display());
-		let mut found = false;
-		for source_dir in ["source", "output", "src"].iter() {
-			let source_dir = &path.join(source_dir);
+	}
+	let src = if let Some((source_dir, output_dir)) = &project.config.source_output_dir {
+		let output_dir = project.path.join(output_dir);
+		if output_dir.exists() {
+			Some(output_dir)
+		} else {
+			let source_dir = project.path.join(source_dir);
 			if source_dir.exists() {
-				found = true;
-				trace!("Found {} in {}", source_dir.display(), path.display());
-				iterate_dir(source_dir, f)?;
-			};
+				Some(source_dir)
+			} else {
+				None
+			}
 		}
-		if !found {
-			iterate_dir(path, f)?;
-		};
-	};
-	Ok(())
-}
-
-pub fn main() -> Result {
-	common::find_project()?;
-
-	let dst = Path::new("compiled");
-
-	iterate_files(&Path::new("."), &mut |root, path| {
-		let dst = &dst.join(path);
-		let src = root.join(path);
-		if src.is_dir() {
-			trace!("DIRECTORY {}", path.display());
-			fs::create_dir_all(dst)
-				.with_context(|_| format!("Could not create directory {}", path.display()))?;
+	} else {
+		let src = project.src();
+		if src.exists() {
+			Some(src)
 		} else {
-			trace!("{}: {}", root.display(), path.display());
-			if dst.exists() {
-				fs::remove_file(dst)?
-			};
-			fs::hard_link(src, dst)?;
-		};
-		Ok(())
-	})
+			None
+		}
+	};
+	if let Some(src) = src {
+		iterate_dir(&src, out)?;
+	}
+	Ok(())
 }

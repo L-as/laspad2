@@ -1,0 +1,11 @@
+[package]
+name = "static_lua"
+version = "0.1.0"
+authors = ["Las <las@protonmail.ch>"]
+edition = "2018"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+nom = "4.1.1"

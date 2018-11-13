@@ -1,164 +1,176 @@
-use failure::*;
-use git2::Repository;
+use const_cstr::const_cstr;
+use derive_more::{Display, From};
+use erroneous::Error as EError;
+use futures::Future;
 use std::{
+	ffi::{CStr, CString},
 	fs,
-	io::Cursor,
-	path::{Path, PathBuf},
-	result::Result as StdResult,
+	io::{self, Cursor},
+	thread::sleep,
+	time::Duration,
 };
+use steam::RemoteStorage;
 
 use crate::{
-	common,
-	config,
+	config::{self, Branch},
+	item::Item,
 	package,
-	steam::{self, GeneralError as SteamError},
-	update,
+	project::Project,
+	util,
 };
 
-#[derive(Debug, Fail)]
-pub enum PublishError {
-	#[fail(display = "Could not publish dummy file to steam")]
-	DummyFile,
-	#[fail(display = "Branch {} does not exist", branch)]
-	NonexistentBranch { branch: String },
-	#[fail(display = "Could not upload zip file to remote storage")]
-	CantUploadMod,
-	#[fail(display = "Could not upload preview to remote storage")]
-	CantUploadPreview,
-	#[fail(display = "Could not update zip file used")]
-	CantUpdateMod,
+#[derive(Debug, Display, EError, From)]
+pub enum Error {
+	#[display(fmt = "Could not generate description")]
+	DescriptionError(#[error(source)] config::DescriptionError),
+	#[display(fmt = "Could not read preview")]
+	Preview(#[error(source)] io::Error),
+	#[display(
+		fmt = "'.modid.{}' does not have a valid format! It should contain the Mod ID of the branch.",
+		branch
+	)]
+	InvalidModIDFileFormat { branch: String },
+	#[display(fmt = "Could not write to '.modid.{}'", branch)]
+	WriteModIDFile { branch: String, source: io::Error },
+	#[display(fmt = "Could not write mod files to remote storage")]
+	WriteFiles(#[error(source)] steam::Error),
+	#[display(fmt = "Could not update mod")]
+	UpdateMod(#[error(source)] steam::Error),
+	#[display(fmt = "{}", _0)]
+	ReadError(#[error(defer)] util::ReadError),
+	#[display(fmt = "Could not create a new mod")]
+	CreateMod(#[error(source)] steam::Error),
+	#[display(fmt = "Could not package mod into a Zip archive")]
+	PackageError(#[error(source)] package::Error),
+	#[display(fmt = "Could not access Steamworks SDK interfaces")]
+	Interface,
 }
 
-type Result<T> = ::std::result::Result<T, Error>;
-
-fn create_workshop_item(
-	remote: &mut steam::RemoteStorage,
-	utils: &mut steam::Utils,
-) -> Result<steam::Item> {
-	ensure!(
-		remote.file_write("laspad_mod.zip", &[0 as u8]).is_ok(),
-		PublishError::DummyFile
-	);
-
-	let apicall =
-		remote.publish_workshop_file("laspad_mod.zip", "laspad_mod.zip", "dummy", "dummy", &[]);
-
-	let result = utils.get_apicall_result::<steam::PublishItemResult>(apicall);
-
-	Ok(StdResult::<_, _>::from(result.result).and(Ok(result.item))?)
+const_cstr! {
+	PATH_ZIP = "laspad_mod.zip";
+	PATH_PREVIEW = "laspad_preview";
 }
 
-pub fn main(branch_name: &str, retry: bool) -> Result<()> {
-	common::find_project()?;
+const WRITE_ZIP_ERROR_MSG: &str = "Couldn't initiate writing ZIP file to Steam Cloud";
+const WRITE_PREVIEW_ERROR_MSG: &str = "Couldn't initiate writing preview to Steam Cloud";
 
-	let config = config::get()?;
-	ensure!(
-		config.contains(branch_name),
-		PublishError::NonexistentBranch {
-			branch: branch_name.to_owned(),
-		}
-	);
-
-	debug!("Connecting to steam process");
-	let client = steam::Client::new()?;
-	debug!("Accessing Remote Storage API");
-	let mut remote = client.remote_storage()?;
-	debug!("Accessing Utils API");
-	let mut utils = client.utils()?;
-
-	let modid_file = PathBuf::from(format!(".modid.{}", branch_name));
-	let item = if modid_file.exists() {
-		steam::Item(u64::from_str_radix(
-			&fs::read_to_string(&modid_file).context("Could not read the modid file")?,
-			16,
-		)?)
-	} else {
-		let item = create_workshop_item(&mut remote, &mut utils)?;
-		info!("Created Mod ID: {:X}", item.0);
-		fs::write(&modid_file, format!("{:X}", item.0).as_bytes())
-			.context("Could not create modid file, next publish will create a new mod!")?;
-		item
-	};
-	debug!("Mod ID: {:X}", item.0);
-
-	let branch = config.get(branch_name)?.unwrap();
-
-	update::main()?;
-
-	let zip = package::zip(branch_name, Cursor::new(Vec::new()))?.into_inner();
-
-	debug!("Uploading zip");
-	if remote.file_write("laspad_mod.zip", &zip).is_err() {
-		bail!(PublishError::CantUploadMod);
-	};
-
-	debug!("Uploading preview");
-	if remote
-		.file_write("laspad_preview", &branch.preview()?)
-		.is_err()
-	{
-		bail!(PublishError::CantUploadPreview);
-	};
-
-	let mut request_update = || {
-		debug!("Requesting workshop item update");
-		let u = remote.update_workshop_file(item);
-		if u.title(&branch.name()?).is_err() {
-			error!("Could not update title");
-		};
-		if u.tags(&branch.tags()?.iter().map(|s| &**s).collect::<Vec<_>>())
-			.is_err()
-		{
-			error!("Could not update tags");
-		};
-		if u.description(&branch.description(item)?).is_err() {
-			error!("Could not update description");
-		};
-		if u.preview("laspad_preview").is_err() {
-			error!("Could not update preview");
-		};
-		if u.contents("laspad_mod.zip").is_err() {
-			bail!(PublishError::CantUpdateMod);
-		};
-		if Path::new(".git").exists() {
-			let repo = Repository::open(".").expect("Could not open git repo!");
-			let head = repo.head()?;
-			let oid = head.peel_to_commit()?.id();
-			if u.change_description(&format!("git commit: {}", oid))
-				.is_err()
-			{
-				error!("Could not update version history");
-			};
-		};
-		let apicall = u.commit();
-
-		let result = utils.get_apicall_result::<steam::UpdateItemResult>(apicall);
-
-		let result = StdResult::<_, _>::from(result.result).and(Ok(result.item));
-		if let Ok(item) = result {
-			println!("Published mod: {:X}", item.0);
-		};
-
-		Ok(result?)
-	};
-
-	if retry {
-		while let Err(e) = request_update() {
-			match e.downcast::<SteamError>() {
-				Ok(e) => {
-					if e == SteamError::Busy {
-						use std::{thread::sleep, time::Duration};
-						sleep(Duration::from_secs(5));
-					} else {
-						bail!(e);
-					}
+macro_rules! repeat {
+	($e:expr) => {
+		loop {
+			match $e {
+				Err(steam::Error::Busy) => {
+					sleep(Duration::from_millis(50));
 				},
-				Err(e) => bail!(e),
-			};
+				v => break v,
+			}
 		}
-	} else {
-		request_update()?;
 	};
+}
+
+fn create_workshop_item<'a>(remote: &'a steam::RemoteStorage<'a>) -> Result<Item, steam::Error> {
+	repeat!(remote.file_write(PATH_ZIP.as_cstr(), [0]).expect(WRITE_ZIP_ERROR_MSG).wait())?;
+
+	let name = const_cstr!("dummy").as_cstr();
+	Ok(repeat!({
+		remote
+			.publish(
+				4920,
+				PATH_ZIP.as_cstr(),
+				PATH_ZIP.as_cstr(),
+				name,
+				name,
+				&[] as &[&CStr],
+			)
+			.expect("Couldn't initiate uploading dummy mod to Steam")
+			.wait()
+	})?
+	.into())
+}
+
+pub fn publish(project: &Project, branch: &Branch, branch_name: &str) -> Result<(), Error> {
+	use self::Error::*;
+
+	let mut steam = steam::STEAM.lock().expect("Couldn't lock Steam mutex");
+	let client = steam.new_client();
+	let remote = client
+		.as_ref()
+		.and_then(|c| RemoteStorage::new(c))
+		.ok_or(Error::Interface)?;
+	let item: Item = match branch.item {
+		Some(i) => i,
+		None => {
+			let path = project.path.join(format!(".modid.{}", branch_name));
+			if path.exists() {
+				util::read_to_string(path)?
+					.parse()
+					.map_err(|_| InvalidModIDFileFormat {
+						branch: branch_name.into(),
+					})?
+			} else {
+				let item = create_workshop_item(&remote).map_err(CreateMod)?;
+				info!("Created new Mod ID");
+				fs::write(path, &format!("{:X}", item.0)).map_err(|e| WriteModIDFile {
+					branch: branch_name.into(),
+					source: e,
+				})?;
+				item
+			}
+		},
+	};
+	info!("Mod ID: {}", item);
+	let zip = package::package(project, branch, Cursor::new(Vec::new()))?.into_inner();
+
+	// FIXME `repeat` each separately but at the same time somehow
+	repeat!({
+		let write_mod = remote.file_write(PATH_ZIP.as_cstr(), &zip).expect(WRITE_ZIP_ERROR_MSG);
+
+		let preview = branch.preview(project).map_err(Preview)?;
+		// mustn't be empty, so we'll make it an empty PNG
+		let preview = if preview.len() == 0 {
+			include_bytes!("../assets/empty.png")
+		} else {
+			&preview[..]
+		};
+
+		let write_preview = remote
+			.file_write(PATH_PREVIEW.as_cstr(), preview)
+			.expect(WRITE_PREVIEW_ERROR_MSG);
+
+		write_mod.join(write_preview).wait()
+	})
+	.map_err(WriteFiles)?;
+
+	repeat!({
+		remote
+			.update(*item)
+			.title(&CString::new(branch.name.as_str()).expect("Couldn't generate FFI-compatible string"))
+			.unwrap()
+			.tags(
+				&branch
+					.tags
+					.iter()
+					.map(|s| CString::new(s.as_str()).expect("Couldn't generate FFI-compatible string"))
+					.collect::<Vec<_>>(),
+			)
+			.unwrap()
+			.description(&CString::new(branch.description(project, item)?).expect("Couldn't generate FFI-compatible string"))
+			.unwrap()
+			.preview(PATH_PREVIEW.as_cstr())
+			.expect(WRITE_PREVIEW_ERROR_MSG)
+			.file(PATH_ZIP.as_cstr())
+			.expect(WRITE_ZIP_ERROR_MSG)
+			.change_description(
+				&CString::new(
+					project
+						.head()
+						.map_or(String::new(), |id| format!("git commit: {}", id)),
+				)
+				.expect("Couldn't generate FFI-compatible string"),
+			)
+			.unwrap()
+			.finish()
+			.wait()
+	}).map_err(UpdateMod)?;
 
 	Ok(())
 }

@@ -1,5 +1,5 @@
 
-[master]                           # variation name, this is the default
+[master]                           # branch name, "master" is the default
 name            = "My mod"         # the name which will be shown on the workshop
 tags            = ["tag1", "tag2"] # tags
 autodescription = true             # whether laspad should automatically include things in your description.

@@ -1,0 +1,12 @@
+[package]
+name = "md_to_bb"
+version = "0.1.0"
+authors = ["Las <las@protonmail.ch>"]
+edition = "2018"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+lazy_static = "1.2"
+regex       = "1.0.6"
