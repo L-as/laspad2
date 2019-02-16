@@ -157,15 +157,15 @@ vice versa.")
 		("init", _) => {
 			Project::new(".")?;
 		},
+		("download", Some(m)) => {
+			let item = m.value_of("MODID").expect("Could not get MODID");
+			let item: Item = item.parse().map_err(|e| (item.to_owned(), e))?;
+			let path = m.value_of("PATH").expect("Could not get PATH");
+			download::download(item, path)?;
+		},
 		(cmd, m) => {
 			let project = project.ok_or(Error::NoProject)?;
 			match (cmd, m) {
-				("download", Some(m)) => {
-					let item = m.value_of("MODID").expect("Could not get MODID");
-					let item: Item = item.parse().map_err(|e| (item.to_owned(), e))?;
-					let path = m.value_of("PATH").expect("Could not get PATH");
-					download::download(item, path)?;
-				},
 				("update", m) => {
 					match m.and_then(|m| m.values_of("ITEMS")) {
 						Some(items) => {
