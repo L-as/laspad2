@@ -85,6 +85,11 @@ fn main() -> Result<(), Error> {
 			(@arg MODID: +required "The workshop item")
 			(@arg PATH:  +required "Where to extract it")
 		)
+		(@subcommand install =>
+			(about: "Download and install mod from workshop into target folder")
+			(@arg MODID: +required "The workshop item")
+			(@arg PATH: "Where to install it (default .)")
+		)
 		(@subcommand compile =>
 			(about: "\
 Merges the dependencies and the `src` folder together into the `compiled` folder.
@@ -162,6 +167,12 @@ vice versa.")
 			let item: Item = item.parse().map_err(|e| (item.to_owned(), e))?;
 			let path = m.value_of("PATH").expect("Could not get PATH");
 			download::download(item, path)?;
+		},
+		("install", Some(m)) => {
+			let item = m.value_of("MODID").expect("Could not get MODID");
+			let item: Item = item.parse().map_err(|e| (item.to_owned(), e))?;
+			let path = m.value_of("PATH").unwrap_or(".");
+			download::install(item, path)?;
 		},
 		(cmd, m) => {
 			let project = project.ok_or(Error::NoProject)?;

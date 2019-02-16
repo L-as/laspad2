@@ -1,5 +1,6 @@
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use curl::easy::Easy;
+use serde_derive::Deserialize;
 use chrono::{Utc, TimeZone};
 use derive_more::{Display, From};
 use erroneous::Error as EError;
@@ -11,27 +12,6 @@ use std::{
 use zip::ZipArchive;
 
 use crate::item::Item;
-
-mod xml {
-	use serde_derive::Deserialize;
-
-	#[derive(Deserialize, Debug)]
-	pub struct PublishedFile {
-		pub publishedfileid: u64,
-		pub file_url:        Box<str>,
-		pub time_updated:    u64,
-	}
-
-	#[derive(Deserialize, Debug)]
-	pub struct PublishedFileDetails {
-		pub publishedfile: PublishedFile,
-	}
-
-	#[derive(Deserialize, Debug)]
-	pub struct Root {
-		pub publishedfiledetails: PublishedFileDetails,
-	}
-}
 
 fn get(url: &str) -> Result<Vec<u8>, curl::Error> {
 	let mut buf = Vec::new();
@@ -70,13 +50,58 @@ pub enum Error {
 	ZipReadFile(String, #[error(source)] io::Error),
 }
 
-pub fn download(item: Item, path: impl AsRef<Path>) -> Result<(), Error> {
-	let path = path.as_ref();
+#[derive(Deserialize, Debug)]
+pub struct PublishedFile {
+	pub file_url:        Box<str>,
+	pub time_updated:    u64,
+}
 
-	let format: xml::Root = serde_xml_rs::from_reader(&*get(&format!(
+pub fn get_info(item: Item) -> Result<PublishedFile, Error> {
+	#[derive(Deserialize, Debug)]
+	pub struct PublishedFileDetails {
+		pub publishedfile: PublishedFile,
+	}
+
+	#[derive(Deserialize, Debug)]
+	pub struct Root {
+		pub publishedfiledetails: PublishedFileDetails,
+	}
+
+	let root: Root = serde_xml_rs::from_reader(&*get(&format!(
 		"http://mods.ns2cdt.com/ISteamRemoteStorage/GetPublishedFileDetails/V0001?format=xml&publishedfileid={}",
 		item.0
 	)).map_err(Error::XMLLoad)?).map_err(|_| Error::XMLRead)?;
+
+	Ok(root.publishedfiledetails.publishedfile)
+}
+
+fn extract(url: &str, path: &Path) -> Result<(), Error> {
+	if path.exists() {
+		fs::remove_dir_all(&path).map_err(Error::RemoveTarget)?;
+	} else {
+		fs::create_dir_all(&path).map_err(Error::CreateTarget)?;
+	}
+
+	let buf = get(url).map_err(Error::ZipLoad)?;
+	let mut archive = ZipArchive::new(Cursor::new(buf))?;
+	for i in 0..archive.len() {
+		let mut file = archive.by_index(i)?;
+		let file_path = path.join(file.name());
+		let file_parent = file_path.parent().expect("Could not get parent of path");
+		fs::create_dir_all(file_parent).map_err(|e| Error::Create(file_parent.into(), e))?;
+		let mut buf = Vec::new();
+		file.read_to_end(&mut buf)
+			.map_err(|e| Error::ZipReadFile(file.name().into(), e))?;
+		File::create(&file_path)
+			.and_then(|mut f| f.write_all(&buf))
+			.map_err(|e| Error::Create(file_path.into(), e))?;
+	}
+	Ok(())
+}
+
+pub fn download(item: Item, path: impl AsRef<Path>) -> Result<(), Error> {
+	let path = path.as_ref();
+	let info = get_info(item)?;
 
 	let local_update = {
 		let path = path.join(".update_timestamp");
@@ -89,7 +114,7 @@ pub fn download(item: Item, path: impl AsRef<Path>) -> Result<(), Error> {
 		}
 	};
 
-	let remote_update = format.publishedfiledetails.publishedfile.time_updated;
+	let remote_update = info.time_updated;
 	if local_update < remote_update {
 		if local_update > 0 {
 			info!(
@@ -102,33 +127,22 @@ pub fn download(item: Item, path: impl AsRef<Path>) -> Result<(), Error> {
 				item, Utc.timestamp(remote_update as i64, 0).date()
 			);
 		}
-		if path.exists() {
-			fs::remove_dir_all(&path).map_err(Error::RemoveTarget)?;
-		} else {
-			fs::create_dir_all(&path).map_err(Error::CreateTarget)?;
-		}
-
-		let url = &format.publishedfiledetails.publishedfile.file_url;
-		let buf = get(url).map_err(Error::ZipLoad)?;
-		let mut archive = ZipArchive::new(Cursor::new(buf))?;
-		for i in 0..archive.len() {
-			let mut file = archive.by_index(i)?;
-			let file_path = path.join(file.name());
-			let file_parent = file_path.parent().expect("Could not get parent of path");
-			fs::create_dir_all(file_parent).map_err(|e| Error::Create(file_parent.into(), e))?;
-			let mut buf = Vec::new();
-			file.read_to_end(&mut buf)
-				.map_err(|e| Error::ZipReadFile(file.name().into(), e))?;
-			File::create(&file_path)
-				.and_then(|mut f| f.write_all(&buf))
-				.map_err(|e| Error::Create(file_path.into(), e))?;
-		}
+		extract(&info.file_url, path)?;
 		File::create(path.join(".update_timestamp"))
 			.and_then(|mut f| f.write_u64::<LE>(remote_update))
 			.map_err(|e| Error::Create(path.join(".update_timestamp"), e))?;
 	} else {
 		debug!("Local workshop item {:8X} copy is up-to-date", item.0);
 	};
+
+	Ok(())
+}
+
+pub fn install(item: Item, path: impl AsRef<Path>) -> Result<(), Error> {
+	let path = path.as_ref();
+	let info = get_info(item)?;
+	let path = path.join(format!("m{:x}_{}", item.0, info.time_updated));
+	extract(&info.file_url, &path)?;
 
 	Ok(())
 }
