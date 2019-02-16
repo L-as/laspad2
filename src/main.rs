@@ -138,7 +138,9 @@ vice versa.")
 		.level(
 			matches
 				.value_of("LOGLEVEL")
-				.map_or(log::LevelFilter::Info, |s| s.parse().expect("Could not parse LOGLEVEL")),
+				.map_or(log::LevelFilter::Info, |s| {
+					s.parse().expect("Could not parse LOGLEVEL")
+				}),
 		)
 		.chain(std::io::stderr())
 		.apply()

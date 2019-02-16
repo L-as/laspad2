@@ -33,7 +33,9 @@ fn iterate_dir(root: &Path, out: &mut impl Out) -> Result<(), Error> {
 	}) {
 		let src = entry?;
 		let src = src.path();
-		let dst = src.strip_prefix(root).expect("Could not strip prefix of path");
+		let dst = src
+			.strip_prefix(root)
+			.expect("Could not strip prefix of path");
 		if src.is_dir() {
 			out.dir(&dst).map_err(|e| Error::Create(dst.into(), e))?;
 		} else {

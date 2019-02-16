@@ -62,13 +62,16 @@ macro_rules! repeat {
 					sleep(Duration::from_millis(50));
 				},
 				v => break v,
+				}
 			}
-		}
 	};
 }
 
 fn create_workshop_item<'a>(remote: &'a steam::RemoteStorage<'a>) -> Result<Item, steam::Error> {
-	repeat!(remote.file_write(PATH_ZIP.as_cstr(), [0]).expect(WRITE_ZIP_ERROR_MSG).wait())?;
+	repeat!(remote
+		.file_write(PATH_ZIP.as_cstr(), [0])
+		.expect(WRITE_ZIP_ERROR_MSG)
+		.wait())?;
 
 	let name = const_cstr!("dummy").as_cstr();
 	Ok(repeat!({
@@ -122,7 +125,9 @@ pub fn publish(project: &Project, branch: &Branch, branch_name: &str) -> Result<
 
 	// FIXME `repeat` each separately but at the same time somehow
 	repeat!({
-		let write_mod = remote.file_write(PATH_ZIP.as_cstr(), &zip).expect(WRITE_ZIP_ERROR_MSG);
+		let write_mod = remote
+			.file_write(PATH_ZIP.as_cstr(), &zip)
+			.expect(WRITE_ZIP_ERROR_MSG);
 
 		let preview = branch.preview(project).map_err(Preview)?;
 		// mustn't be empty, so we'll make it an empty PNG
@@ -143,17 +148,25 @@ pub fn publish(project: &Project, branch: &Branch, branch_name: &str) -> Result<
 	repeat!({
 		remote
 			.update(*item)
-			.title(&CString::new(branch.name.as_str()).expect("Couldn't generate FFI-compatible string"))
+			.title(
+				&CString::new(branch.name.as_str())
+					.expect("Couldn't generate FFI-compatible string"),
+			)
 			.unwrap()
 			.tags(
 				&branch
 					.tags
 					.iter()
-					.map(|s| CString::new(s.as_str()).expect("Couldn't generate FFI-compatible string"))
+					.map(|s| {
+						CString::new(s.as_str()).expect("Couldn't generate FFI-compatible string")
+					})
 					.collect::<Vec<_>>(),
 			)
 			.unwrap()
-			.description(&CString::new(branch.description(project, item)?).expect("Couldn't generate FFI-compatible string"))
+			.description(
+				&CString::new(branch.description(project, item)?)
+					.expect("Couldn't generate FFI-compatible string"),
+			)
 			.unwrap()
 			.preview(PATH_PREVIEW.as_cstr())
 			.expect(WRITE_PREVIEW_ERROR_MSG)
@@ -170,7 +183,8 @@ pub fn publish(project: &Project, branch: &Branch, branch_name: &str) -> Result<
 			.unwrap()
 			.finish()
 			.wait()
-	}).map_err(UpdateMod)?;
+	})
+	.map_err(UpdateMod)?;
 
 	Ok(())
 }

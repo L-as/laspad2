@@ -69,7 +69,13 @@ impl Dependency {
 			e => return e,
 		};
 
-		Ok(name.unwrap_or_else(|| self.path.file_name().expect("No filename for dependency").to_string_lossy().into()))
+		Ok(name.unwrap_or_else(|| {
+			self.path
+				.file_name()
+				.expect("No filename for dependency")
+				.to_string_lossy()
+				.into()
+		}))
 	}
 
 	pub fn url(&self) -> Option<String> {
@@ -128,7 +134,9 @@ impl Project {
 				.map_err(NewError::IgnoreModification)?;
 		};
 
-		Ok(Self::get(path).expect("Failed to get project after creating it").expect("Failed to properly create project"))
+		Ok(Self::get(path)
+			.expect("Failed to get project after creating it")
+			.expect("Failed to properly create project"))
 	}
 
 	pub fn path_for_item(&self, i: Item) -> PathBuf {
@@ -138,16 +146,15 @@ impl Project {
 	}
 
 	pub fn update(&self, i: Vec<Item>) -> Result<(), UpdateError> {
-		use rayon::prelude::*;
 		use self::UpdateError::*;
+		use rayon::prelude::*;
 
 		i.into_par_iter().try_for_each(|item| {
 			if !self.config.deps.contains(&item) {
 				return Err(NotFound(item));
 			}
 
-			download::download(item, self.path_for_item(item))
-				.map_err(|e| DownloadError(item, e))
+			download::download(item, self.path_for_item(item)).map_err(|e| DownloadError(item, e))
 		})?;
 		Ok(())
 	}

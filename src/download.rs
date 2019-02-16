@@ -1,9 +1,9 @@
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
+use chrono::{TimeZone, Utc};
 use curl::easy::Easy;
-use serde_derive::Deserialize;
-use chrono::{Utc, TimeZone};
 use derive_more::{Display, From};
 use erroneous::Error as EError;
+use serde_derive::Deserialize;
 use std::{
 	fs::{self, File},
 	io::{self, Cursor, Read, Write},
@@ -52,8 +52,8 @@ pub enum Error {
 
 #[derive(Deserialize, Debug)]
 pub struct PublishedFile {
-	pub file_url:        Box<str>,
-	pub time_updated:    u64,
+	pub file_url:     Box<str>,
+	pub time_updated: u64,
 }
 
 pub fn get_info(item: Item) -> Result<PublishedFile, Error> {
@@ -119,12 +119,15 @@ pub fn download(item: Item, path: impl AsRef<Path>) -> Result<(), Error> {
 		if local_update > 0 {
 			info!(
 				"Workshop item {} is outdated, old: {}, new: {}",
-				item, Utc.timestamp(local_update as i64, 0).date(), Utc.timestamp(remote_update as i64, 0).date()
+				item,
+				Utc.timestamp(local_update as i64, 0).date(),
+				Utc.timestamp(remote_update as i64, 0).date()
 			);
 		} else {
 			info!(
 				"Workshop item {} is outdated, old: None, new: {}",
-				item, Utc.timestamp(remote_update as i64, 0).date()
+				item,
+				Utc.timestamp(remote_update as i64, 0).date()
 			);
 		}
 		extract(&info.file_url, path)?;
