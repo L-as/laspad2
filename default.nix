@@ -8,20 +8,23 @@ in stdenv.mkDerivation rec {
 	version = "2.0.0";
 
 	src = ./.;
-	#src = null;
 
 	inherit libsteam_api;
 	buildInputs = [latest.rustChannels.nightly.rust openssl gcc pkgconfig];
 
 	buildPhase = ''
 		env RUST_BACKTRACE=1 cargo rustc -- -C link-arg=-Wl,"$libsteam_api"
-		patchelf --remove-needed libsteam_api.so ./target/debug/laspad
-		patchelf --add-needed "$libsteam_api" ./target/debug/laspad
 	'';
 
 	installPhase = ''
 		mkdir -p "$out/bin"
 		mv target/debug/laspad "$out/bin"
+		cp assets/steam_appid.txt "$out/bin"
+	'';
+
+	postFixup = ''
+		patchelf --remove-needed libsteam_api.so "$out/bin/laspad"
+		patchelf --add-needed "$libsteam_api" "$out/bin/laspad"
 	'';
 
 	dontFixLibtool = true;
