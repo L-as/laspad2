@@ -14,7 +14,8 @@ in stdenv.mkDerivation rec {
 	buildInputs = [latest.rustChannels.nightly.rust openssl gcc pkgconfig];
 
 	buildPhase = ''
-		env RUST_BACKTRACE=1 "HOME=$(pwd)" cargo rustc -- -C link-arg=-Wl,--unresolved-symbols=ignore-all
+		env RUST_BACKTRACE=1 cargo rustc -- -C link-arg=-Wl,"$libsteam_api"
+		patchelf --remove-needed libsteam_api.so ./target/debug/laspad
 		patchelf --add-needed "$libsteam_api" ./target/debug/laspad
 	'';
 
