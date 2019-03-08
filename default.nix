@@ -10,7 +10,8 @@ in stdenv.mkDerivation rec {
 	src = ./.;
 
 	inherit libsteam_api;
-	buildInputs = [latest.rustChannels.nightly.rust openssl gcc pkgconfig];
+	nativeBuildInputs = [cargo gcc pkgconfig nix];
+	buildInputs = [openssl];
 
 	buildPhase = ''
 		env RUST_BACKTRACE=1 cargo rustc -- -C link-arg=-Wl,"$libsteam_api"

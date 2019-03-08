@@ -86,9 +86,8 @@ fn main() -> Result<(), Error> {
 			(@arg PATH:  +required "Where to extract it")
 		)
 		(@subcommand install =>
-			(about: "Download and install mod from workshop into target folder")
-			(@arg MODID: +required "The workshop item")
-			(@arg PATH: "Where to install it (default .)")
+			(about: "Download and install mods from workshop into current folder")
+			(@arg MODIDS: +multiple +required "The workshop items")
 		)
 		(@subcommand compile =>
 			(about: "\
@@ -171,10 +170,13 @@ vice versa.")
 			download::download(item, path)?;
 		},
 		("install", Some(m)) => {
-			let item = m.value_of("MODID").expect("Could not get MODID");
-			let item: Item = item.parse().map_err(|e| (item.to_owned(), e))?;
-			let path = m.value_of("PATH").unwrap_or(".");
-			download::install(item, path)?;
+			let items = m.values_of("MODIDS").expect("Could not get MODIDS");
+			let items: Result<Vec<Item>, _> = items
+				.map(|i| i.parse().map_err(|e| (i.to_owned(), e)))
+				.collect();
+			for item in items? {
+				download::install(item, ".")?;
+			}
 		},
 		(cmd, m) => {
 			let project = project.ok_or(Error::NoProject)?;
