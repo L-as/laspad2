@@ -13,7 +13,7 @@ let
 			sha256 = "0000000000000000000000000000000000000000000000000000";
 		}
 		else throw "laspad does not support this platform!";
-in rustPlatform.buildRustCrate rec {
+in rustPlatform.buildRustPackage rec {
 	name = "laspad-${version}";
 	version = "2.0.0";
 
