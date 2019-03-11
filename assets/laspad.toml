@@ -1,5 +1,14 @@
+# Indicates the version of laspad's configuration used
+version = 1
 
-[master]                           # branch name, "master" is the default
+# These mods are included in your mod
+# You probably want to remove these examples
+dependencies = [
+	"https://steamcommunity.com/sharedfiles/filedetails/?id=1674847865", # BetterMarineMinimap
+	"637CEBDD" # Skill Tier Badges - Discord Edition
+]
+
+[branch.master]                    # branch name, "master" is the default
 name            = "My mod"         # the name which will be shown on the workshop
 tags            = ["tag1", "tag2"] # tags
 autodescription = true             # whether laspad should automatically include things in your description.
