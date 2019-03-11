@@ -1,16 +1,26 @@
-with import <nixpkgs> {};
-let libsteam_api = fetchurl {
-	url = https://raw.githubusercontent.com/rlabrecque/Steamworks.NET/master/Plugins/x86_64/libsteam_api.so;
-	sha256 = "04rqg7d4vzi9kf948bm8dw1q2z6gn3qqxma5ajahbcd9dhms0bs0";
-};
-in stdenv.mkDerivation rec {
+{sha256, pkgs ? import <nixpkgs> {}}: with pkgs;
+let
+	steamworks_net = "https://raw.githubusercontent.com/rlabrecque/Steamworks.NET/2d8e525a51cef096bf97cf101e13354d0c7dfd66/Plugins/x86_64/";
+	libsteam_api =
+		if stdenv.hostPlatform.config == "x86_64-unknown-linux-gnu"
+		then fetchurl {
+			url = steamworks_net + "libsteam_api.so";
+			sha256 = "0qsn4a3xbwk4n4xhw797ffpi25mzgs07w43y1jb9hw0rxjsm30yz";
+		}
+		else if stdenv.hostPlatform.config == "x86_64-pc-mingw32"
+		then fetchurl {
+			url = steamworks_net + "steam_api64.dll";
+			sha256 = "0000000000000000000000000000000000000000000000000000";
+		}
+		else throw "laspad does not support this platform!";
+in rustPlatform.buildRustCrate rec {
 	name = "laspad-${version}";
 	version = "2.0.0";
 
 	src = ./.;
 
 	inherit libsteam_api;
-	nativeBuildInputs = [cargo gcc pkgconfig nix];
+	nativeBuildInputs = [stdenv.cc pkgconfig];
 	buildInputs = [openssl];
 
 	buildPhase = ''
@@ -28,5 +38,5 @@ in stdenv.mkDerivation rec {
 		patchelf --add-needed "$libsteam_api" "$out/bin/laspad"
 	'';
 
-	dontFixLibtool = true;
+	cargoSha256 = sha256;
 }
