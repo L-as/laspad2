@@ -215,7 +215,9 @@ vice versa.")
 					let mut out = Target {
 						path: project.path.join("compiled"),
 					};
-					fs::remove_dir_all(&out.path).map_err(Error::RemoveCompiled)?;
+					if out.path.exists() {
+						fs::remove_dir_all(&out.path).map_err(Error::RemoveCompiled)?;
+					}
 					compile::compile(&project, &mut out)?;
 				},
 				("package", Some(m)) => {
