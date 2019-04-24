@@ -21,7 +21,7 @@ in rustPlatform.buildRustPackage rec {
 
 	inherit libsteam_api;
 	nativeBuildInputs = [stdenv.cc pkgconfig];
-	buildInputs = [openssl];
+	buildInputs = [openssl_1_1];
 
 	buildPhase = ''
 		env RUST_BACKTRACE=1 cargo rustc -- -C link-arg=-Wl,"$libsteam_api"
