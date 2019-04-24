@@ -24,12 +24,12 @@ in rustPlatform.buildRustPackage rec {
 	buildInputs = [openssl_1_1];
 
 	buildPhase = ''
-		env RUST_BACKTRACE=1 cargo rustc -- -C link-arg=-Wl,"$libsteam_api"
+		env RUST_BACKTRACE=1 cargo rustc --release -- -C link-arg=-Wl,"$libsteam_api"
 	'';
 
 	installPhase = ''
 		mkdir -p "$out/bin"
-		mv target/debug/laspad "$out/bin"
+		mv target/release/laspad "$out/bin"
 		cp assets/steam_appid.txt "$out/bin"
 	'';
 
