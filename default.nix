@@ -14,7 +14,7 @@ let
 		}
 		else throw "laspad does not support this platform!";
 in rustPlatform.buildRustPackage rec {
-	name = "laspad-${version}";
+	pname = "laspad";
 	version = "2.0.0";
 
 	src = ./.;
