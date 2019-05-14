@@ -89,10 +89,11 @@ impl Branch {
 			};
 
 			format!(
-				"[b]Mod ID: {item:X}[/b]\n{website}{dependencies}",
+				"[b]Mod ID: {item:X}[/b]\n{website}{dependencies}\n{custom}",
 				item = item.0,
 				website = website,
 				dependencies = deps,
+				custom = description,
 			)
 		} else {
 			description.into()
